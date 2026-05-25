@@ -3,6 +3,7 @@ import { Container } from '@n8n/di';
 import {
 	type WorkflowExecuteMode,
 	type IRunExecutionData,
+	type RedactionSource,
 	type Workflow,
 	type WorkflowSettings,
 } from 'n8n-workflow';
@@ -33,13 +34,13 @@ function deriveEnforcedPolicy(enforcement: RedactionEnforcement): WorkflowSettin
 function resolveRedactionPolicy(
 	workflow: Workflow,
 	additionalData: PreExecutionAdditionalData | undefined,
-): WorkflowSettings.RedactionPolicy {
+): { policy: WorkflowSettings.RedactionPolicy; source: RedactionSource } {
 	const enforcement = additionalData?.redactionContext?.enforcement;
 	if (enforcement?.enforced) {
-		return deriveEnforcedPolicy(enforcement);
+		return { policy: deriveEnforcedPolicy(enforcement), source: 'instance' };
 	}
 
-	return workflow.settings?.redactionPolicy ?? 'none';
+	return { policy: workflow.settings?.redactionPolicy ?? 'none', source: 'workflow' };
 }
 
 /**
@@ -162,7 +163,7 @@ export const establishExecutionContext = async (
 		source: mode,
 		redaction: {
 			version: 1,
-			policy: resolveRedactionPolicy(workflow, additionalData),
+			...resolveRedactionPolicy(workflow, additionalData),
 		},
 	};
 

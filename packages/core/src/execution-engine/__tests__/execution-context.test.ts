@@ -1070,7 +1070,7 @@ describe('establishExecutionContext', () => {
 			);
 
 			const context = runExecutionData.executionData!.runtimeData!;
-			expect(context.redaction).toEqual({ version: 1, policy: 'none' });
+			expect(context.redaction).toEqual({ version: 1, policy: 'none', source: 'workflow' });
 		});
 
 		it('should capture redaction policy "all" from workflow settings', async () => {
@@ -1099,7 +1099,7 @@ describe('establishExecutionContext', () => {
 			);
 
 			const context = runExecutionData.executionData!.runtimeData!;
-			expect(context.redaction).toEqual({ version: 1, policy: 'all' });
+			expect(context.redaction).toEqual({ version: 1, policy: 'all', source: 'workflow' });
 		});
 
 		it('should capture redaction policy "non-manual" from workflow settings', async () => {
@@ -1128,7 +1128,7 @@ describe('establishExecutionContext', () => {
 			);
 
 			const context = runExecutionData.executionData!.runtimeData!;
-			expect(context.redaction).toEqual({ version: 1, policy: 'non-manual' });
+			expect(context.redaction).toEqual({ version: 1, policy: 'non-manual', source: 'workflow' });
 		});
 
 		it('should use child workflow redaction policy over parent in sub-workflows', async () => {
@@ -1174,7 +1174,7 @@ describe('establishExecutionContext', () => {
 			const context = runExecutionData.executionData!.runtimeData!;
 
 			// Child workflow's redaction policy should take precedence
-			expect(context.redaction).toEqual({ version: 1, policy: 'non-manual' });
+			expect(context.redaction).toEqual({ version: 1, policy: 'non-manual', source: 'workflow' });
 			// But parent credentials should still be inherited
 			expect(context.credentials).toBe('parent-credentials');
 		});
@@ -1360,6 +1360,7 @@ describe('establishExecutionContext', () => {
 			expect(runExecutionData.executionData!.runtimeData!.redaction).toEqual({
 				version: 1,
 				policy: 'non-manual',
+				source: 'instance',
 			});
 		});
 
@@ -1374,6 +1375,7 @@ describe('establishExecutionContext', () => {
 			expect(runExecutionData.executionData!.runtimeData!.redaction).toEqual({
 				version: 1,
 				policy: 'all',
+				source: 'instance',
 			});
 		});
 
@@ -1389,6 +1391,7 @@ describe('establishExecutionContext', () => {
 			expect(runExecutionData.executionData!.runtimeData!.redaction).toEqual({
 				version: 1,
 				policy: 'manual-only',
+				source: 'instance',
 			});
 		});
 
@@ -1403,6 +1406,7 @@ describe('establishExecutionContext', () => {
 			expect(runExecutionData.executionData!.runtimeData!.redaction).toEqual({
 				version: 1,
 				policy: 'none',
+				source: 'instance',
 			});
 		});
 
@@ -1426,6 +1430,7 @@ describe('establishExecutionContext', () => {
 			expect(runExecutionData.executionData!.runtimeData!.redaction).toEqual({
 				version: 1,
 				policy: 'all',
+				source: 'workflow',
 			});
 		});
 
@@ -1447,6 +1452,7 @@ describe('establishExecutionContext', () => {
 			expect(runExecutionData.executionData!.runtimeData!.redaction).toEqual({
 				version: 1,
 				policy: 'non-manual',
+				source: 'workflow',
 			});
 		});
 
@@ -1518,7 +1524,7 @@ describe('establishExecutionContext', () => {
 
 			const context = runExecutionData.executionData!.runtimeData!;
 			// Child enforcement wins over inherited parent policy
-			expect(context.redaction).toEqual({ version: 1, policy: 'non-manual' });
+			expect(context.redaction).toEqual({ version: 1, policy: 'non-manual', source: 'instance' });
 			// Parent credentials still inherited
 			expect(context.credentials).toBe('parent-credentials');
 		});

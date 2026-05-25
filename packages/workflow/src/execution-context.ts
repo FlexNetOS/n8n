@@ -113,9 +113,14 @@ const RedactionPolicySchema = z.union([
 	z.literal('manual-only'),
 ]);
 
+const RedactionSourceSchema = z.union([z.literal('workflow'), z.literal('instance')]);
+
+export type RedactionSource = z.output<typeof RedactionSourceSchema>;
+
 const RedactionSettingSchemaV1 = z.object({
 	version: z.literal(1),
 	policy: RedactionPolicySchema,
+	source: RedactionSourceSchema.optional(),
 });
 
 export type IRedactionSettingV1 = z.output<typeof RedactionSettingSchemaV1>;
