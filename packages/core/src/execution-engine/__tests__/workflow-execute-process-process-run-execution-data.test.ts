@@ -247,7 +247,7 @@ describe('processRunExecutionData', () => {
 			// The function returns a Promise, but throws synchronously, so we can't await it.
 			// eslint-disable-next-line @typescript-eslint/promise-function-async
 			expect(() => workflowExecute.processRunExecutionData(workflow)).toThrow(
-				/The workflow has issues and cannot be executed for that reason\. Please fix them first\. Issues: 'node': Parameter "Required Text" is required\./,
+				/^The workflow has issues and cannot be executed for that reason\. Please fix them first\. Issues: 'node': Parameter "Required Text" is required\.$/,
 			);
 		});
 
