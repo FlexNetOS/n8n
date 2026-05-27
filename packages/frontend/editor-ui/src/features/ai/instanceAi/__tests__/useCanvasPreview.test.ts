@@ -6,6 +6,7 @@ import type {
 	InstanceAiToolCallState,
 } from '@n8n/api-types';
 import { useCanvasPreview } from '../useCanvasPreview';
+import type { ThreadRuntime } from '../instanceAi.store';
 import type { ResourceEntry } from '../useResourceRegistry';
 
 // ---------------------------------------------------------------------------
@@ -131,8 +132,7 @@ function setup(options?: { threadOverrides?: Partial<MockThread> }) {
 	const route = createMockRoute();
 
 	const result = useCanvasPreview({
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		thread: thread as any,
+		thread: thread as unknown as ThreadRuntime,
 		threadId: () => route.params.threadId,
 	});
 

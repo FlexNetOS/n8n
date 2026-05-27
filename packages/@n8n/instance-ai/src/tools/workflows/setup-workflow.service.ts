@@ -144,7 +144,7 @@ export async function stripStaleCredentialsFromNode(
 
 /**
  * Run {@link stripStaleCredentialsFromNode} over every node in a workflow.
- * Intended to run after `resolveCredentials` in the builder save paths so the
+ * Intended to run before credential resolution in the builder save paths so the
  * LLM can't persist stale credential references between turns.
  */
 export async function stripStaleCredentialsFromWorkflow(

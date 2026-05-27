@@ -85,7 +85,11 @@ function buildResultNeedsSetup(result: Record<string, unknown>): boolean {
 
 function isWorkflowBuildToolCall(tc: InstanceAiAgentNode['toolCalls'][number]): boolean {
 	const action = (tc.args as Record<string, unknown> | undefined)?.action;
-	return tc.toolName === 'workflows' && (action === 'create' || action === 'update');
+	return (
+		(tc.toolName === 'workflows' && (action === 'create' || action === 'update')) ||
+		tc.toolName === 'build-workflow' ||
+		tc.toolName === 'submit-workflow'
+	);
 }
 
 /**

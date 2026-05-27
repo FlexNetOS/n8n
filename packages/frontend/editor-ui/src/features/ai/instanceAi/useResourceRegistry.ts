@@ -88,21 +88,33 @@ function entryFromListItem(
 /** Tools whose results may contain resource info (workflows, credentials, data tables). */
 const ARTIFACT_TOOLS = new Set([
 	'apply-workflow-credentials',
+	'build-workflow',
 	'workflows',
 	'credentials',
 	'data-tables',
 	'insert-data-table-rows',
+	'submit-workflow',
 	'update-data-table-rows',
 	'delete-data-table-rows',
 ]);
+
+function isWorkflowMutationToolCall(
+	tc: InstanceAiToolCallState,
+	action: string | undefined,
+): boolean {
+	return (
+		(tc.toolName === 'workflows' && (action === 'create' || action === 'update')) ||
+		tc.toolName === 'build-workflow' ||
+		tc.toolName === 'submit-workflow'
+	);
+}
 
 function extractFromToolCall(tc: InstanceAiToolCallState, col: Collections): void {
 	if (!ARTIFACT_TOOLS.has(tc.toolName)) return;
 	if (!tc.result || typeof tc.result !== 'object') return;
 	const result = tc.result as Record<string, unknown>;
 	const action = optionalString(tc.args?.action);
-	const isWorkflowMutation =
-		tc.toolName === 'workflows' && (action === 'create' || action === 'update');
+	const isWorkflowMutation = isWorkflowMutationToolCall(tc, action);
 
 	// --- Workflows --------------------------------------------------------
 	// List result: { workflows: [{ id, name }, ...] } — index by name only.

@@ -1062,6 +1062,7 @@ export function getRenderHint(
 	if (toolName === 'workflows' && (args?.action === 'create' || args?.action === 'update')) {
 		return 'builder';
 	}
+	if (toolName === 'build-workflow-with-agent') return 'builder';
 	if (toolName === 'research-with-agent') return 'researcher';
 	if (toolName === 'plan') return 'planner';
 	if (toolName === 'eval-setup-with-agent') return 'eval-setup';

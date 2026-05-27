@@ -21,6 +21,15 @@ function getStringProp(record: Record<string, unknown>, key: string): string | u
 	return typeof value === 'string' ? value : undefined;
 }
 
+function isWorkflowMutationToolCall(tc: InstanceAiToolCallState): boolean {
+	const action = getStringProp(tc.args, 'action');
+	return (
+		(tc.toolName === 'workflows' && (action === 'create' || action === 'update')) ||
+		tc.toolName === 'build-workflow' ||
+		tc.toolName === 'submit-workflow'
+	);
+}
+
 /** Extract all artifacts (workflows and data tables) from a node's tool calls. */
 export function extractArtifacts(node: InstanceAiAgentNode): ArtifactInfo[] {
 	if (node.status !== 'completed') return [];
@@ -69,12 +78,8 @@ export function extractArtifactsFromToolCall(
 	const artifacts: ArtifactInfo[] = [];
 	const workflowId = getStringProp(result, 'workflowId');
 
-	const action = getStringProp(tc.args, 'action');
-	const isWorkflowMutation =
-		tc.toolName === 'workflows' && (action === 'create' || action === 'update');
-
 	// Workflow artifacts from workflow create/update
-	if (isWorkflowMutation && workflowId && !seenIds.has(workflowId)) {
+	if (isWorkflowMutationToolCall(tc) && workflowId && !seenIds.has(workflowId)) {
 		seenIds.add(workflowId);
 		const name =
 			getStringProp(result, 'workflowName') ?? getStringProp(tc.args, 'name') ?? 'Untitled';

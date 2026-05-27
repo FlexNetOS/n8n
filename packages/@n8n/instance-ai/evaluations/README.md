@@ -317,9 +317,9 @@ pnpm eval:discovery --filter data-table-skill-loading --trials 3 --verbose --fai
 Verbose output lists each trial's completed tool calls with argument previews.
 For data-table routing, look for `load_skill(skillId="data-table-manager")`
 and `data-tables(action="list")`, and verify there are no planner or delegate
-	entries in the spawned-agent section. Workflow building routing is covered by
-	orchestrator discovery fixtures that require `load_skill("workflow-builder")`
-	and direct `workflows(action="create"|"update")` calls.
+entries in the spawned-agent section. Workflow building routing is covered by
+orchestrator discovery fixtures that require `load_skill("workflow-builder")`
+and direct `workflows(action="create"|"update")` calls.
 
 ## How the e2e harness works
 

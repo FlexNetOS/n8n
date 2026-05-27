@@ -1,6 +1,7 @@
 import type { InstanceAiMessage } from '@n8n/api-types';
 import { describe, expect, it } from 'vitest';
 
+import { stripInternalInstanceAiBlocks } from '../internalBlocks';
 import { messageHasVisibleContent } from '../messageVisibility';
 
 function assistantMessage(content: string): InstanceAiMessage {
@@ -31,5 +32,23 @@ describe('messageHasVisibleContent', () => {
 				),
 			),
 		).toBe(true);
+	});
+
+	it('hides assistant messages that only contain attributed internal blocks', () => {
+		expect(
+			messageHasVisibleContent(
+				assistantMessage(
+					'<planned-task-follow-up type="checkpoint">{"taskId":"task-1"}</planned-task-follow-up>',
+				),
+			),
+		).toBe(false);
+	});
+
+	it('strips complete attributed internal blocks without eating following text', () => {
+		expect(
+			stripInternalInstanceAiBlocks(
+				'Done.\n<planned-task-follow-up type="checkpoint">{"taskId":"task-1"}</planned-task-follow-up>\nVisible next',
+			),
+		).toBe('Done.\n\nVisible next');
 	});
 });

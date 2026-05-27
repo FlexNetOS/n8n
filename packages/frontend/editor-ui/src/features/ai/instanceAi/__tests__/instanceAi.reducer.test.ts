@@ -658,6 +658,10 @@ describe('instanceAi.reducer', () => {
 			expect(getRenderHint('workflows', { action: 'list' })).toBe('default');
 		});
 
+		test('keeps builder render hint for persisted legacy workflow builder tool calls', () => {
+			expect(getRenderHint('build-workflow-with-agent')).toBe('builder');
+		});
+
 		test('returns default for direct data-table tool', () => {
 			expect(getRenderHint('data-tables')).toBe('default');
 		});

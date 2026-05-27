@@ -419,6 +419,12 @@ describe('parseStoredMessages', () => {
 							toolName: 'plan',
 							result: 'ok',
 						},
+						{
+							type: 'tool-result',
+							toolCallId: 'tc-4',
+							toolName: 'build-workflow-with-agent',
+							result: 'ok',
+						},
 					],
 					createdAt: makeDate(1),
 				},
@@ -430,6 +436,7 @@ describe('parseStoredMessages', () => {
 			expect(toolCalls[0].renderHint).toBe('delegate');
 			expect(toolCalls[1].renderHint).toBe('builder');
 			expect(toolCalls[2].renderHint).toBe('planner');
+			expect(toolCalls[3].renderHint).toBe('builder');
 		});
 	});
 

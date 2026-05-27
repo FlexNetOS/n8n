@@ -111,6 +111,27 @@ describe('extractArtifacts', () => {
 		]);
 	});
 
+	test('returns workflow artifact from persisted legacy workflow builder tool call', () => {
+		const node = makeAgentNode({
+			toolCalls: [
+				makeToolCall({
+					toolName: 'submit-workflow',
+					result: { workflowId: 'wf-legacy', workflowName: 'Legacy WF' },
+					completedAt: '2026-01-01T00:00:00Z',
+				}),
+			],
+		});
+
+		expect(extractArtifacts(node)).toEqual([
+			{
+				type: 'workflow',
+				resourceId: 'wf-legacy',
+				name: 'Legacy WF',
+				completedAt: '2026-01-01T00:00:00Z',
+			},
+		]);
+	});
+
 	test('falls back to args.name when result.workflowName is missing', () => {
 		const node = makeAgentNode({
 			toolCalls: [

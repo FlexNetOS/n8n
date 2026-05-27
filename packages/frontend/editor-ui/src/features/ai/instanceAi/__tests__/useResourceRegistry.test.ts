@@ -88,6 +88,48 @@ describe('useResourceRegistry', () => {
 			expect(resourceNameIndex.value.get('my workflow')?.id).toBe('wf-1');
 		});
 
+		test('registers workflow artifacts from persisted legacy workflow builder results', async () => {
+			const { messages, producedArtifacts, resourceNameIndex } = setup();
+
+			messages.value = [
+				makeMessage({
+					agentTree: makeAgentNode({
+						toolCalls: [
+							makeToolCall({
+								toolName: 'build-workflow',
+								result: {
+									success: true,
+									workflowId: 'wf-legacy-build',
+									workflowName: 'Legacy Build',
+								},
+							}),
+							makeToolCall({
+								toolName: 'submit-workflow',
+								result: {
+									success: true,
+									workflowId: 'wf-legacy-submit',
+									workflowName: 'Legacy Submit',
+								},
+							}),
+						],
+					}),
+				}),
+			];
+			await nextTick();
+
+			expect(producedArtifacts.value.get('wf-legacy-build')).toEqual(
+				expect.objectContaining({ type: 'workflow', id: 'wf-legacy-build', name: 'Legacy Build' }),
+			);
+			expect(producedArtifacts.value.get('wf-legacy-submit')).toEqual(
+				expect.objectContaining({
+					type: 'workflow',
+					id: 'wf-legacy-submit',
+					name: 'Legacy Submit',
+				}),
+			);
+			expect(resourceNameIndex.value.get('legacy submit')?.id).toBe('wf-legacy-submit');
+		});
+
 		test('marks workflow artifacts that still need setup', async () => {
 			const { messages, producedArtifacts } = setup();
 

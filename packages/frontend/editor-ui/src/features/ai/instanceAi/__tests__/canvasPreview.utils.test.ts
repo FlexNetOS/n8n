@@ -91,6 +91,28 @@ describe('getLatestBuildResult', () => {
 		});
 	});
 
+	test('returns workflowId from persisted legacy workflow builder tool results', () => {
+		const node = makeAgentNode({
+			toolCalls: [
+				makeToolCall({
+					toolCallId: 'tc-legacy-build',
+					toolName: 'build-workflow',
+					result: { success: true, workflowId: 'wf-legacy-build' },
+				}),
+				makeToolCall({
+					toolCallId: 'tc-legacy-submit',
+					toolName: 'submit-workflow',
+					result: { success: true, workflowId: 'wf-legacy-submit' },
+				}),
+			],
+		});
+
+		expect(getLatestBuildResult(node)).toEqual({
+			workflowId: 'wf-legacy-submit',
+			toolCallId: 'tc-legacy-submit',
+		});
+	});
+
 	test('marks workflow build results that require setup', () => {
 		const node = makeAgentNode({
 			toolCalls: [
