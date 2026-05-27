@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import VueMarkdown from 'vue-markdown-render';
+import { useI18n } from '@n8n/i18n';
 import { ref, useCssModule } from 'vue';
 import type { InstanceAiMarkdownChunk } from '../markdownParser';
 import { useInstanceAiMarkdownOptions } from '../composables/useInstanceAiMarkdownOptions';
@@ -16,6 +17,7 @@ const {
 
 const emit = defineEmits<{ openArtifact: [title: string] }>();
 
+const i18n = useI18n();
 const styles = useCssModule();
 const markdown = useInstanceAiMarkdownOptions(
 	styles.codeBlockActions,
@@ -65,14 +67,16 @@ defineExpose({
 		:class="$style.command"
 		@click="emit('openArtifact', source.command.title)"
 	>
-		Updated <b>{{ source.command.title }}</b>
+		{{ i18n.baseText('instanceAi.markdown.artifactUpdated') }}
+		<b>{{ source.command.title }}</b>
 	</button>
 	<button
 		v-else-if="source.type === 'artifact-create' && !source.isIncomplete"
 		:class="$style.command"
 		@click="emit('openArtifact', source.command.title)"
 	>
-		Created <b>{{ source.command.title }}</b>
+		{{ i18n.baseText('instanceAi.markdown.artifactCreated') }}
+		<b>{{ source.command.title }}</b>
 	</button>
 </template>
 

@@ -1719,7 +1719,6 @@ export class InstanceAiService {
 				role: 'researcher',
 				tools: [],
 				taskId,
-				kind: 'researcher',
 				title: 'Researching',
 				subtitle: 'Timeout simulation',
 				goal: 'Simulate a stuck background task timeout',

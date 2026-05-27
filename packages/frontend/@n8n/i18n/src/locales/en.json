@@ -5697,6 +5697,8 @@
 	"instanceAi.artifactCard.hours": "{count} hours",
 	"instanceAi.artifactCard.createdAt": "Created {date}",
 	"instanceAi.artifactCard.columns": "{count} columns",
+	"instanceAi.markdown.artifactCreated": "Created",
+	"instanceAi.markdown.artifactUpdated": "Updated",
 	"instanceAi.researchCard.title": "Researching",
 	"instanceAi.researchCard.title.analyzing": "Analyzing results",
 	"instanceAi.researchCard.phase.searching": "Searching",
