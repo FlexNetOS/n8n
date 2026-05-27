@@ -9,6 +9,7 @@ import { jsonParse } from 'n8n-workflow';
 import { EnterpriseCredentialsService } from '@/credentials/credentials.service.ee';
 import { BadRequestError } from '@/errors/response-errors/bad-request.error';
 import { NotFoundError } from '@/errors/response-errors/not-found.error';
+import { OAuthBrowserBindingService } from '@/oauth/oauth-browser-binding.service';
 import { CreateCsrfStateData, OauthService } from '@/oauth/oauth.service';
 
 import { DynamicCredentialResolverRepository } from './database/repositories/credential-resolver.repository';
@@ -30,6 +31,7 @@ export class DynamicCredentialsController {
 		private readonly cipher: Cipher,
 		private readonly dynamicCredentialCorsService: DynamicCredentialCorsService,
 		private readonly dynamicCredentialWebService: DynamicCredentialWebService,
+		private readonly browserBindingService: OAuthBrowserBindingService,
 	) {}
 
 	private async findCredentialToUse(credentialId: string): Promise<CredentialsEntity> {
@@ -149,16 +151,18 @@ export class DynamicCredentialsController {
 			});
 		}
 
-		const callerData: [CredentialsEntity, CreateCsrfStateData] = [
-			credential,
-			{
-				cid: credential.id,
-				origin: 'dynamic-credential',
-				authorizationHeader: req.headers.authorization || `Bearer ${credentialContext.identity}`,
-				authMetadata: credentialContext.metadata,
-				credentialResolverId: req.query.resolverId,
-			},
-		];
+		const csrfData: CreateCsrfStateData = {
+			cid: credential.id,
+			origin: 'dynamic-credential',
+			authorizationHeader: req.headers.authorization || `Bearer ${credentialContext.identity}`,
+			authMetadata: credentialContext.metadata,
+			credentialResolverId: req.query.resolverId,
+		};
+		if (this.browserBindingService.isEnabled()) {
+			const nonce = this.browserBindingService.ensureBindingCookie(req, res);
+			csrfData.bindingHash = this.browserBindingService.computeHash(nonce);
+		}
+		const callerData: [CredentialsEntity, CreateCsrfStateData] = [credential, csrfData];
 
 		if (credential.type.toLowerCase().includes('oauth2')) {
 			return await this.oauthService.generateAOauth2AuthUri(...callerData);
