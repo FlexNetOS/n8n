@@ -36,6 +36,12 @@ Use the saved build outcome as the routing source:
   manually.
 
 `verify-built-workflow` and `executions(action="run")` work without publishing.
+Internal verification is not a substitute for an explicit user request to run or
+execute the workflow. If the original request asked to run/execute after
+building, finish lifecycle verification first, then call
+`executions(action="run", requireApproval=true)` for the saved workflow so normal
+run approval applies. Do not set `requireApproval=true` for internal lifecycle
+verification.
 
 ## Per-Trigger inputData Shape
 

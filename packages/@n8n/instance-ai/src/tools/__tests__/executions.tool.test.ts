@@ -332,6 +332,30 @@ describe('executions tool', () => {
 				expect(context.executionService.run).not.toHaveBeenCalled();
 				expect(result).toBeUndefined();
 			});
+
+			it('requires HITL approval for explicit user-requested runs even when workflow id is in the allow-list', async () => {
+				const context = createMockContext({
+					permissions: { runWorkflow: 'always_allow' },
+					allowedRunWorkflowIds: new Set(['wf-1']),
+				});
+				(context.workflowService.get as jest.Mock).mockResolvedValue({ name: 'Scoped WF' });
+				const suspendFn = jest.fn();
+
+				const tool = createExecutionsTool(context);
+				const result = await executeTool(
+					tool,
+					{ action: 'run' as const, workflowId: 'wf-1', requireApproval: true },
+					createAgentCtx({ suspend: suspendFn }) as never,
+				);
+
+				expect(suspendFn).toHaveBeenCalledWith(
+					expect.objectContaining({
+						message: 'Execute Scoped WF (ID: wf-1)',
+					}),
+				);
+				expect(context.executionService.run).not.toHaveBeenCalled();
+				expect(result).toBeUndefined();
+			});
 		});
 	});
 

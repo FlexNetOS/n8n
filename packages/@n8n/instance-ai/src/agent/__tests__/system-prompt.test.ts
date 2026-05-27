@@ -10,6 +10,7 @@ describe('getSystemPrompt', () => {
 			expect(prompt).toContain("Keep it tied to the user's goal, not the tool name");
 			expect(prompt).toContain('narrate between tools whenever a tool result changes');
 			expect(prompt).toContain('do not run through multiple phases silently');
+			expect(prompt).toContain('Do not call any more tools after planning');
 			expect(prompt).toContain('applies to normal turns and system-generated follow-up turns');
 			expect(prompt).toContain('Never let an empty assistant message');
 			expect(prompt).toContain('[Calling tools: ...]');
@@ -280,6 +281,16 @@ describe('getSystemPrompt', () => {
 			expect(prompt).toContain('setup is deferred after verification passes');
 			expect(prompt).toContain('verifiedWithMocks: true');
 			expect(prompt).toContain('setupDeferred: true');
+		});
+
+		it('does not treat internal verification as an explicit user-requested run', () => {
+			const prompt = getSystemPrompt({});
+
+			expect(prompt).toContain(
+				'Internal verification is not a substitute for an explicit user request to run or execute the workflow',
+			);
+			expect(prompt).toContain('executions(action="run", requireApproval=true)');
+			expect(prompt).toContain('so normal run approval applies');
 		});
 
 		it('tells the orchestrator it may patch directly during a checkpoint', () => {
