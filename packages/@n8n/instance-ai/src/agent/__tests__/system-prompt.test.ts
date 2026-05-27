@@ -8,6 +8,7 @@ describe('getSystemPrompt', () => {
 			expect(prompt).toContain('before your first tool call');
 			expect(prompt).toContain('write one short sentence');
 			expect(prompt).toContain("Keep it tied to the user's goal, not the tool name");
+			expect(prompt).toContain('add a brief progress sentence between meaningful phases');
 			expect(prompt).toContain('Never let an empty assistant message');
 			expect(prompt).toContain('[Calling tools: ...]');
 		});
@@ -180,6 +181,8 @@ describe('getSystemPrompt', () => {
 			const prompt = getSystemPrompt({});
 
 			expect(prompt).toContain('workflow-builder` skill owns node discovery');
+			expect(prompt).toContain('Use the `nodes` tool for node type IDs');
+			expect(prompt).toContain('do not use web research to discover node IDs');
 			expect(prompt).toContain('follow its build lifecycle reference');
 			expect(prompt).toContain('outcome.verificationReadiness');
 			expect(prompt).toContain('outcome.setupRequirement');
@@ -214,6 +217,15 @@ describe('getSystemPrompt', () => {
 			expect(prompt).toContain('outcome.verificationReadiness');
 			expect(prompt).toContain('outcome.setupRequirement');
 			expect(prompt).toContain('<planned-task-follow-up type="checkpoint">');
+		});
+
+		it('keeps workItemId distinct from workflowId during planned build follow-ups', () => {
+			const prompt = getSystemPrompt({});
+
+			expect(prompt).toContain('If `buildTask.workflowId` is absent');
+			expect(prompt).toContain('`workItemId` is tracking metadata');
+			expect(prompt).toContain('must never be used as a workflow ID');
+			expect(prompt).toContain('with that exact workflow ID');
 		});
 
 		it('reuses deterministic already-verified readiness instead of re-running verify', () => {

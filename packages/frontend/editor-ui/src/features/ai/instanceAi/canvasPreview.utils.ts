@@ -11,6 +11,8 @@ export interface BuildResult {
 	workflowId: string;
 	/** Unique per build — changes even when the same workflow is rebuilt. */
 	toolCallId: string;
+	/** True when setup should be handled in chat before opening the full workflow preview. */
+	needsSetup?: boolean;
 }
 
 export interface WorkflowBuildTarget {
@@ -51,11 +53,34 @@ export function getLatestBuildResult(node: InstanceAiAgentNode): BuildResult | u
 		) {
 			const result = tc.result as Record<string, unknown>;
 			if (result.success === true && typeof result.workflowId === 'string') {
-				return { workflowId: result.workflowId, toolCallId: tc.toolCallId };
+				return {
+					workflowId: result.workflowId,
+					toolCallId: tc.toolCallId,
+					...(buildResultNeedsSetup(result) ? { needsSetup: true } : {}),
+				};
 			}
 		}
 	}
 	return undefined;
+}
+
+function buildResultNeedsSetup(result: Record<string, unknown>): boolean {
+	const setupRequirement = result.setupRequirement;
+	if (setupRequirement && typeof setupRequirement === 'object') {
+		const status = (setupRequirement as Record<string, unknown>).status;
+		if (status === 'required') return true;
+	}
+
+	const verificationReadiness = result.verificationReadiness;
+	if (verificationReadiness && typeof verificationReadiness === 'object') {
+		const status = (verificationReadiness as Record<string, unknown>).status;
+		if (status === 'needs_setup') return true;
+	}
+
+	return (
+		(Array.isArray(result.mockedNodeNames) && result.mockedNodeNames.length > 0) ||
+		(Array.isArray(result.mockedCredentialTypes) && result.mockedCredentialTypes.length > 0)
+	);
 }
 
 function isWorkflowBuildToolCall(tc: InstanceAiAgentNode['toolCalls'][number]): boolean {

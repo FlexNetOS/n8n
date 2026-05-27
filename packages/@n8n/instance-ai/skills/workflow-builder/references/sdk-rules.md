@@ -5,8 +5,9 @@ Use this reference before writing or repairing TypeScript SDK code for
 
 ## Imports And Expressions
 
-- Do not use web search to learn workflow SDK syntax. Use this reference, node
-  type definitions, and `workflows(action="create"|"update")` validation errors.
+- Do not use web search to learn workflow SDK syntax or node type IDs. Use this
+  reference, the `nodes` tool's search/type-definition results, and
+  `workflows(action="create"|"update")` validation errors.
 - Always import SDK factories directly: `workflow`, `node`, `trigger`,
   `sticky`, `placeholder`, `newCredential`, `ifElse`, `switchCase`, `merge`,
   `splitInBatches`, `nextBatch`, `languageModel`, `memory`, `tool`,

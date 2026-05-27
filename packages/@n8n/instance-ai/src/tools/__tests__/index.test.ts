@@ -161,7 +161,7 @@ describe('domain tool construction', () => {
 		expect(createDataTablesTool).toHaveBeenCalledWith(context);
 	});
 
-	it('limits planned workflow-build follow-ups to save-only workflow actions', () => {
+	it('limits planned workflow-build follow-ups for new workflows to create actions', () => {
 		const context = makeContext({
 			plannedBuildTask: {
 				threadId: 'thread-a',
@@ -178,7 +178,33 @@ describe('domain tool construction', () => {
 		const { createWorkflowsTool } = jest.requireMock('../workflows.tool');
 		expect(createWorkflowsTool).toHaveBeenCalledWith(context, {
 			surface: 'orchestrator',
-			allowedActions: ['list', 'get', 'get-as-code', 'create', 'update'],
+			allowedActions: ['list', 'get', 'get-as-code', 'create'],
+			descriptionPrefix: 'Planned workflow-build follow-up for a new workflow',
+			descriptionSuffix: 'The workItemId wi-1 is build tracking metadata, not a workflowId.',
+		});
+	});
+
+	it('limits planned workflow-build follow-ups for existing workflows to update actions', () => {
+		const context = makeContext({
+			plannedBuildTask: {
+				threadId: 'thread-a',
+				taskId: 'task-build',
+				workItemId: 'wi-1',
+				title: 'Build workflow',
+				spec: 'Build it',
+				workflowId: 'wf-1',
+				plannedTaskService: {},
+			} as unknown as InstanceAiContext['plannedBuildTask'],
+		});
+
+		createOrchestratorDomainTools(context);
+
+		const { createWorkflowsTool } = jest.requireMock('../workflows.tool');
+		expect(createWorkflowsTool).toHaveBeenCalledWith(context, {
+			surface: 'orchestrator',
+			allowedActions: ['list', 'get', 'get-as-code', 'update'],
+			descriptionPrefix: 'Planned workflow-build follow-up for existing workflow wf-1',
+			descriptionSuffix: 'The workItemId wi-1 is build tracking metadata, not a workflowId.',
 		});
 	});
 

@@ -31,6 +31,20 @@ const patchSchema = z.object({
 const PLANNED_TEMPORARY_CREATE_ERROR =
 	'Do not set temporary: true for planned build tasks. Omit temporary for final planned workflow deliverables.';
 
+const PLANNED_CREATE_UPDATE_ERROR =
+	'This planned build task creates a new workflow. The workItemId is tracking metadata, not a workflow ID. Call workflows(action="create") without workflowId.';
+
+function plannedUpdateCreateError(workflowId: string): string {
+	return `This planned build task targets existing workflow ${workflowId}. Call workflows(action="update") with that workflowId instead of creating a new workflow.`;
+}
+
+function plannedUpdateWrongWorkflowError(
+	expectedWorkflowId: string,
+	receivedWorkflowId: string,
+): string {
+	return `This planned build task targets workflow ${expectedWorkflowId}, so it cannot update workflow ${receivedWorkflowId}. Use the planned workflowId from the build task.`;
+}
+
 // Coerce JSON-stringified arrays into arrays. The model sometimes sends `patches`
 // as a JSON string because the payload contains escaped code. Leave non-strings
 // untouched so Zod can validate them normally.
@@ -209,6 +223,38 @@ function blockTemporaryPlannedBuildCreate(
 ): { success: false; errors: string[] } | undefined {
 	if (context.plannedBuildTask && input.action === 'create' && input.temporary === true) {
 		return { success: false, errors: [PLANNED_TEMPORARY_CREATE_ERROR] };
+	}
+
+	return undefined;
+}
+
+function blockPlannedBuildActionMismatch(
+	context: InstanceAiContext,
+	input: WorkflowCodeActionInput,
+): { success: false; errors: string[] } | undefined {
+	const plannedBuildTask = context.plannedBuildTask;
+	if (!plannedBuildTask) return undefined;
+
+	if (!plannedBuildTask.workflowId && input.action === 'update') {
+		return { success: false, errors: [PLANNED_CREATE_UPDATE_ERROR] };
+	}
+
+	if (plannedBuildTask.workflowId && input.action === 'create') {
+		return {
+			success: false,
+			errors: [plannedUpdateCreateError(plannedBuildTask.workflowId)],
+		};
+	}
+
+	if (
+		plannedBuildTask.workflowId &&
+		input.action === 'update' &&
+		input.workflowId !== plannedBuildTask.workflowId
+	) {
+		return {
+			success: false,
+			errors: [plannedUpdateWrongWorkflowError(plannedBuildTask.workflowId, input.workflowId)],
+		};
 	}
 
 	return undefined;
@@ -645,6 +691,8 @@ export function createWorkflowCodeService(context: InstanceAiContext) {
 		if (missingSkill) return missingSkill;
 		const blockedTemporaryPlannedBuild = blockTemporaryPlannedBuildCreate(context, input);
 		if (blockedTemporaryPlannedBuild) return blockedTemporaryPlannedBuild;
+		const plannedBuildActionMismatch = blockPlannedBuildActionMismatch(context, input);
+		if (plannedBuildActionMismatch) return plannedBuildActionMismatch;
 
 		const { code, patches, projectId, name } = input;
 		const workflowId = getWorkflowId(input);

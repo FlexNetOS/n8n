@@ -91,6 +91,28 @@ describe('getLatestBuildResult', () => {
 		});
 	});
 
+	test('marks workflow build results that require setup', () => {
+		const node = makeAgentNode({
+			toolCalls: [
+				makeToolCall({
+					toolCallId: 'tc-build-setup',
+					toolName: 'workflows',
+					result: {
+						success: true,
+						workflowId: 'wf-setup',
+						setupRequirement: { status: 'required' },
+					},
+				}),
+			],
+		});
+
+		expect(getLatestBuildResult(node)).toEqual({
+			workflowId: 'wf-setup',
+			toolCallId: 'tc-build-setup',
+			needsSetup: true,
+		});
+	});
+
 	test('returns the latest result when multiple builds exist', () => {
 		const node = makeAgentNode({
 			toolCalls: [

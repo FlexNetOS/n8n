@@ -404,7 +404,7 @@ describe('workflow code create/update approval flow', () => {
 		expect(result).toEqual({ success: false, errors: ['Workflow save failed: suspended'] });
 	});
 
-	it('does not let a planned create task update arbitrary workflows without approval', async () => {
+	it('rejects update calls for planned create tasks before asking for approval', async () => {
 		const ctx = makeContext(
 			{ createWorkflow: 'always_allow', updateWorkflow: 'always_allow' },
 			{
@@ -423,21 +423,22 @@ describe('workflow code create/update approval flow', () => {
 		const suspend = jest.fn().mockRejectedValue(new Error('suspended'));
 
 		const result = await service.update(
-			{ action: 'update', code: validCode, workflowId: 'wf-other', name: 'Lead intake' },
+			{ action: 'update', code: validCode, workflowId: 'wi-1', name: 'Lead intake' },
 			{ resumeData: undefined, suspend } as WorkflowCodeToolContext,
 		);
 
-		expect(suspend).toHaveBeenCalledWith(
-			expect.objectContaining({
-				message: 'Update workflow Lead intake (ID: wf-other)',
-				severity: 'info',
-			}),
-		);
+		expect(suspend).not.toHaveBeenCalled();
+		expect(mockedParseAndValidate).not.toHaveBeenCalled();
 		expect(ctx.workflowService.updateFromWorkflowJSON).not.toHaveBeenCalled();
-		expect(result).toEqual({ success: false, errors: ['Workflow save failed: suspended'] });
+		expect(result).toEqual({
+			success: false,
+			errors: [
+				'This planned build task creates a new workflow. The workItemId is tracking metadata, not a workflow ID. Call workflows(action="create") without workflowId.',
+			],
+		});
 	});
 
-	it('does not let a planned update task create a new workflow without approval', async () => {
+	it('rejects create calls for planned update tasks before asking for approval', async () => {
 		const ctx = makeContext(
 			{ createWorkflow: 'always_allow', updateWorkflow: 'always_allow' },
 			{
@@ -461,14 +462,50 @@ describe('workflow code create/update approval flow', () => {
 			{ resumeData: undefined, suspend } as WorkflowCodeToolContext,
 		);
 
-		expect(suspend).toHaveBeenCalledWith(
-			expect.objectContaining({
-				message: 'Create workflow Lead intake',
-				severity: 'info',
-			}),
-		);
+		expect(suspend).not.toHaveBeenCalled();
+		expect(mockedParseAndValidate).not.toHaveBeenCalled();
 		expect(ctx.workflowService.createFromWorkflowJSON).not.toHaveBeenCalled();
-		expect(result).toEqual({ success: false, errors: ['Workflow save failed: suspended'] });
+		expect(result).toEqual({
+			success: false,
+			errors: [
+				'This planned build task targets existing workflow wf-1. Call workflows(action="update") with that workflowId instead of creating a new workflow.',
+			],
+		});
+	});
+
+	it('rejects wrong workflow IDs for planned update tasks before asking for approval', async () => {
+		const ctx = makeContext(
+			{ createWorkflow: 'always_allow', updateWorkflow: 'always_allow' },
+			{
+				plannedBuildTask: {
+					threadId: 'thread-1',
+					taskId: 'task-1',
+					workItemId: 'wi-1',
+					title: 'Update workflow',
+					spec: 'Update it',
+					workflowId: 'wf-1',
+					plannedTaskService: { markSucceeded: jest.fn() },
+				} as unknown as InstanceAiContext['plannedBuildTask'],
+				allowedUpdateWorkflowIds: new Set(['wf-1']),
+			},
+		);
+		const service = createWorkflowCodeService(ctx);
+		const suspend = jest.fn().mockRejectedValue(new Error('suspended'));
+
+		const result = await service.update(
+			{ action: 'update', code: validCode, workflowId: 'wf-other', name: 'Lead intake' },
+			{ resumeData: undefined, suspend } as WorkflowCodeToolContext,
+		);
+
+		expect(suspend).not.toHaveBeenCalled();
+		expect(mockedParseAndValidate).not.toHaveBeenCalled();
+		expect(ctx.workflowService.updateFromWorkflowJSON).not.toHaveBeenCalled();
+		expect(result).toEqual({
+			success: false,
+			errors: [
+				'This planned build task targets workflow wf-1, so it cannot update workflow wf-other. Use the planned workflowId from the build task.',
+			],
+		});
 	});
 
 	it('returns a successful save with warning when planned build reporting fails after save', async () => {

@@ -189,6 +189,13 @@ export function useCanvasPreview({
 			if (!toolCallId || !latestBuildResult.value) return;
 			if (thread.isHydratingThread) return;
 
+			if (latestBuildResult.value.needsSetup) {
+				if (activeTabId.value === latestBuildResult.value.workflowId) {
+					workflowRefreshKey.value++;
+				}
+				return;
+			}
+
 			activeTabId.value = latestBuildResult.value.workflowId;
 			workflowRefreshKey.value++;
 		},

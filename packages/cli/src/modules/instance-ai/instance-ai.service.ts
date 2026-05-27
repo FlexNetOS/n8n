@@ -2165,6 +2165,7 @@ export class InstanceAiService {
 			correlationId?: string;
 			workSummary?: WorkSummary;
 			errorMessage?: string;
+			suppressCompletedFallback?: boolean;
 		} = {},
 	): TerminalResponseDecision | undefined {
 		const guard = new InstanceAiTerminalResponseGuard({
@@ -2172,6 +2173,7 @@ export class InstanceAiService {
 			rootAgentId: ORCHESTRATOR_AGENT_ID,
 			messageGroupId: options.messageGroupId,
 			correlationId: options.correlationId,
+			suppressCompletedFallback: options.suppressCompletedFallback,
 		});
 		const decision = guard.evaluateTerminal(
 			this.getTerminalGuardEvents(threadId, runId, options.messageGroupId),
@@ -3625,6 +3627,7 @@ export class InstanceAiService {
 				messageGroupId,
 				correlationId: messageId,
 				workSummary: result.workSummary,
+				suppressCompletedFallback: Boolean(plannedBuild || checkpoint?.isCheckpointFollowUp),
 			});
 			const finalStatus = result.status === 'errored' ? 'error' : result.status;
 			await this.finalizeRunTracing(runId, tracing, {
@@ -4389,6 +4392,9 @@ export class InstanceAiService {
 			this.evaluateTerminalResponse(opts.threadId, opts.runId, result.status, {
 				messageGroupId,
 				workSummary: result.workSummary,
+				suppressCompletedFallback: Boolean(
+					opts.plannedBuild || opts.checkpoint?.isCheckpointFollowUp,
+				),
 			});
 			const finalStatus = result.status === 'errored' ? 'error' : result.status;
 			await this.finalizeRunTracing(opts.runId, opts.tracing, {

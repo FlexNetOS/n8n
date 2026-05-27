@@ -82,22 +82,32 @@ const loadWorkspaceTool = lazyMod(
 	() => require('./workspace.tool') as typeof import('./workspace.tool'),
 );
 
-const PLANNED_BUILD_WORKFLOW_ACTIONS = [
+const PLANNED_BUILD_WORKFLOW_READ_ACTIONS = [
 	'list',
 	'get',
 	'get-as-code',
-	'create',
-	'update',
 ] as const satisfies readonly WorkflowAction[];
+
+function getPlannedBuildWorkflowActions(context: InstanceAiContext): readonly WorkflowAction[] {
+	return [
+		...PLANNED_BUILD_WORKFLOW_READ_ACTIONS,
+		context.plannedBuildTask?.workflowId ? 'update' : 'create',
+	];
+}
 
 function getOrchestratorWorkflowsToolOptions(
 	context: InstanceAiContext,
 ): 'orchestrator' | WorkflowsToolOptions {
 	if (!context.plannedBuildTask) return 'orchestrator';
+	const { workflowId, workItemId } = context.plannedBuildTask;
 
 	return {
 		surface: 'orchestrator',
-		allowedActions: PLANNED_BUILD_WORKFLOW_ACTIONS,
+		allowedActions: getPlannedBuildWorkflowActions(context),
+		descriptionPrefix: workflowId
+			? `Planned workflow-build follow-up for existing workflow ${workflowId}`
+			: 'Planned workflow-build follow-up for a new workflow',
+		descriptionSuffix: `The workItemId ${workItemId} is build tracking metadata, not a workflowId.`,
 	};
 }
 

@@ -64,7 +64,8 @@ builder discipline even though workflow tools are native.
 - Never invent credential IDs, API tokens, resource IDs, Slack channels,
   Telegram chat IDs, email addresses, bearer tokens, or sample user data. Use
   `placeholder()` for user-provided values that setup must collect later.
-- Do not use web search to learn workflow SDK syntax.
+- Do not use web search to learn workflow SDK syntax or node type IDs; use the
+  `nodes` tool for node search and type definitions.
 - Do not use `workflows(action="update-json")`; it is reserved for internal eval
   setup flows that patch raw WorkflowJSON after separate approval.
 - Publish only when the user explicitly asks.

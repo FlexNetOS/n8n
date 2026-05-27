@@ -15,7 +15,11 @@ import {
 } from '../tool-registry';
 import { createAllTools, createOrchestratorDomainTools, createOrchestrationTools } from '../tools';
 import { createToolsFromLocalMcpServer } from '../tools/filesystem/create-tools-from-mcp-server';
-import { ALWAYS_LOADED_TOOL_NAMES, CHECKPOINT_FOLLOW_UP_TOOL_NAMES } from '../tools/tool-ids';
+import {
+	ALWAYS_LOADED_TOOL_NAMES,
+	CHECKPOINT_FOLLOW_UP_TOOL_NAMES,
+	PLANNED_BUILD_FOLLOW_UP_TOOL_NAMES,
+} from '../tools/tool-ids';
 import { buildAgentTraceInputs, mergeTraceRunInputs } from '../tracing/langsmith-tracing';
 import type { CreateInstanceAgentOptions, InstanceAiToolRegistry } from '../types';
 
@@ -23,7 +27,7 @@ import type { CreateInstanceAgentOptions, InstanceAiToolRegistry } from '../type
 
 function splitDeferredTools(
 	tools: InstanceAiToolRegistry,
-	options: { isCheckpointFollowUp?: boolean } = {},
+	options: { isCheckpointFollowUp?: boolean; isPlannedBuildFollowUp?: boolean } = {},
 ) {
 	const coreTools = createToolRegistry();
 	const deferredTools = createToolRegistry();
@@ -31,7 +35,8 @@ function splitDeferredTools(
 	for (const [name, tool] of tools) {
 		if (
 			ALWAYS_LOADED_TOOL_NAMES.has(name) ||
-			(options.isCheckpointFollowUp && CHECKPOINT_FOLLOW_UP_TOOL_NAMES.has(name))
+			(options.isCheckpointFollowUp && CHECKPOINT_FOLLOW_UP_TOOL_NAMES.has(name)) ||
+			(options.isPlannedBuildFollowUp && PLANNED_BUILD_FOLLOW_UP_TOOL_NAMES.has(name))
 		) {
 			coreTools.set(name, tool);
 		} else {
@@ -161,6 +166,7 @@ export async function createInstanceAgent(options: CreateInstanceAgentOptions): 
 		}) ?? allOrchestratorTools;
 	const { coreTools, deferredTools } = splitDeferredTools(tracedOrchestratorTools, {
 		isCheckpointFollowUp: orchestrationContext?.isCheckpointFollowUp,
+		isPlannedBuildFollowUp: Boolean(context.plannedBuildTask),
 	});
 	const hasDeferrableTools = !options.disableDeferredTools && deferredTools.size > 0;
 	const runtimeTools = hasDeferrableTools ? coreTools : tracedOrchestratorTools;

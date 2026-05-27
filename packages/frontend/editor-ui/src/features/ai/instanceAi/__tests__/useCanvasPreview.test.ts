@@ -384,6 +384,35 @@ describe('useCanvasPreview', () => {
 			expect(ctx.isPreviewVisible.value).toBe(true);
 		});
 
+		test('does not auto-open workflow preview while setup is required', async () => {
+			const ctx = setup();
+			ctx.thread.isStreaming = true;
+			registerWorkflow(ctx.thread, 'wf-needs-setup');
+
+			ctx.thread.messages = [
+				makeMessage({
+					agentTree: makeAgentNode({
+						toolCalls: [
+							makeToolCall({
+								toolCallId: 'tc-build-setup',
+								toolName: 'workflows',
+								result: {
+									success: true,
+									workflowId: 'wf-needs-setup',
+									setupRequirement: { status: 'required' },
+								},
+							}),
+						],
+					}),
+				}),
+			];
+			await nextTick();
+
+			expect(ctx.allArtifactTabs.value.some((tab) => tab.id === 'wf-needs-setup')).toBe(true);
+			expect(ctx.activeTabId.value).toBeUndefined();
+			expect(ctx.isPreviewVisible.value).toBe(false);
+		});
+
 		test('does not auto-open while hydrating historical messages', async () => {
 			const ctx = setup();
 			// Simulate the loadHistoricalMessages window: artifacts that surface

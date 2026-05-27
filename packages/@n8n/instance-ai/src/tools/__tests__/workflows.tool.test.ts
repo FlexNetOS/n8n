@@ -248,6 +248,73 @@ describe('workflows tool', () => {
 				}).success,
 			).toBe(true);
 		});
+
+		it('should remind planned create follow-ups that workItemId is not a workflowId', async () => {
+			const context = createMockContext({
+				plannedBuildTask: {
+					threadId: 'thread-1',
+					taskId: 'task-1',
+					workItemId: 'wi_123',
+					title: 'Build Slack to Notion',
+					spec: 'Build it',
+					plannedTaskService: {},
+				} as unknown as InstanceAiContext['plannedBuildTask'],
+			});
+			context.workflowService.list = jest.fn().mockResolvedValue([]);
+			const tool = createWorkflowsTool(context, {
+				surface: 'orchestrator',
+				allowedActions: ['list', 'get', 'get-as-code', 'create'],
+			});
+
+			const result = await executeTool(tool, { action: 'list' } as never, {} as never);
+
+			expect(result).toMatchObject({
+				workflows: [],
+				plannedBuildHint: expect.stringContaining('creates a new workflow'),
+			});
+			expect((result as { plannedBuildHint: string }).plannedBuildHint).toContain(
+				'workItemId wi_123 is tracking metadata, not a workflow ID',
+			);
+			expect((result as { plannedBuildHint: string }).plannedBuildHint).toContain(
+				'workflows(action="create")',
+			);
+		});
+
+		it('should steer planned create follow-ups away from guessed workflow IDs', async () => {
+			const context = createMockContext({
+				plannedBuildTask: {
+					threadId: 'thread-1',
+					taskId: 'task-1',
+					workItemId: 'wi_123',
+					title: 'Build Slack to Notion',
+					spec: 'Build it',
+					plannedTaskService: {},
+				} as unknown as InstanceAiContext['plannedBuildTask'],
+			});
+			context.workflowService.get = jest.fn().mockRejectedValue(new Error('not found'));
+			context.workflowService.list = jest.fn().mockResolvedValue([]);
+			const tool = createWorkflowsTool(context, {
+				surface: 'orchestrator',
+				allowedActions: ['list', 'get', 'get-as-code', 'create'],
+			});
+
+			const result = await executeTool(
+				tool,
+				{ action: 'get', workflowId: 'wi_123' } as never,
+				{} as never,
+			);
+
+			expect(result).toMatchObject({
+				workflowId: 'wi_123',
+				found: false,
+				availableWorkflows: [],
+				hint: expect.stringContaining('workflows(action="create")'),
+			});
+			expect((result as { hint: string }).hint).toContain(
+				'workItemId wi_123 is tracking metadata, not a workflow ID',
+			);
+			expect((result as { hint: string }).hint).toContain('Do not retry');
+		});
 	});
 
 	describe('version actions', () => {

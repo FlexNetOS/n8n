@@ -365,7 +365,8 @@ async function handleList(context: InstanceAiContext, input: Extract<Input, { ac
 		query: input.query,
 		...(input.status ? { status: input.status } : {}),
 	});
-	return { workflows };
+	const plannedBuildHint = getPlannedBuildWorkflowHint(context);
+	return { workflows, ...(plannedBuildHint ? { plannedBuildHint } : {}) };
 }
 
 async function handleGet(context: InstanceAiContext, input: Extract<Input, { action: 'get' }>) {
@@ -383,11 +384,32 @@ async function handleGet(context: InstanceAiContext, input: Extract<Input, { act
 			found: false as const,
 			error: message,
 			availableWorkflows: available,
-			hint:
-				'No workflow exists with that id. Pick one from `availableWorkflows` or call `workflows(action="list")` for the current set. ' +
-				'Do not retry with a guessed id — if the user did not provide one, you are building a new workflow.',
+			hint: getWorkflowNotFoundHint(context),
 		};
 	}
+}
+
+function getPlannedBuildWorkflowHint(context: InstanceAiContext): string | undefined {
+	const task = context.plannedBuildTask;
+	if (!task) return undefined;
+
+	if (task.workflowId) {
+		return `Planned build task "${task.title}" targets workflow ${task.workflowId}; use workflows(action="update", workflowId="${task.workflowId}") after loading workflow-builder. The workItemId ${task.workItemId} is tracking metadata, not a workflow ID.`;
+	}
+
+	return `Planned build task "${task.title}" creates a new workflow; use workflows(action="create") after loading workflow-builder. The workItemId ${task.workItemId} is tracking metadata, not a workflow ID.`;
+}
+
+function getWorkflowNotFoundHint(context: InstanceAiContext): string {
+	const plannedBuildHint = getPlannedBuildWorkflowHint(context);
+	if (plannedBuildHint) {
+		return `${plannedBuildHint} Do not retry with a guessed workflow ID.`;
+	}
+
+	return (
+		'No workflow exists with that id. Pick one from `availableWorkflows` or call `workflows(action="list")` for the current set. ' +
+		'Do not retry with a guessed id — if the user did not provide one, you are building a new workflow.'
+	);
 }
 
 async function handleGetJson(

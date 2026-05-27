@@ -243,6 +243,40 @@ describe('createInstanceAgent', () => {
 		expect(deferredTools['executions-checkpoint-run']).toBeUndefined();
 	});
 
+	it('eager-loads node browsing for planned workflow build follow-up runs', async () => {
+		await createInstanceAgent({
+			modelId: 'test-model',
+			context: {
+				runLabel: 'planned-build-run',
+				localGatewayStatus: undefined,
+				licenseHints: undefined,
+				localMcpServer: undefined,
+				plannedBuildTask: {
+					threadId: 'thread-1',
+					taskId: 'build-1',
+					workItemId: 'wi-1',
+					title: 'Build workflow',
+					spec: 'Build it',
+					plannedTaskService: {},
+				},
+			},
+			orchestrationContext: {
+				runId: 'planned-build-run',
+				browserMcpConfig: undefined,
+			},
+			memoryConfig: { lastMessages: 20 },
+			mcpManager: createMcpManagerStub(),
+		} as never);
+
+		const attachedTools = getAttachedTools();
+		const deferredTools = getDeferredTools();
+
+		expect(attachedTools['nodes-planned-build-run']).toMatchObject({
+			name: 'nodes-planned-build-run',
+		});
+		expect(deferredTools['nodes-planned-build-run']).toBeUndefined();
+	});
+
 	it('does not attach a workspace to the orchestrator Agent', async () => {
 		const memoryConfig = { lastMessages: 20 } as never;
 		const fakeWorkspace = { id: 'should-be-ignored' } as never;

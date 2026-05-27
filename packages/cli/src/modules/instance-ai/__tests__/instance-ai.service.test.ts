@@ -52,13 +52,28 @@ jest.mock('@n8n/instance-ai', () => {
 		PlannedTaskStorage: class {},
 		PlannedTaskCoordinator: class {},
 		InstanceAiTerminalResponseGuard: class {
-			constructor(private readonly options: { runId: string; rootAgentId: string }) {}
+			constructor(
+				private readonly options: {
+					runId: string;
+					rootAgentId: string;
+					suppressCompletedFallback?: boolean;
+				},
+			) {}
 
 			evaluateTerminal(
 				_events: unknown[],
 				status: 'completed' | 'cancelled' | 'errored',
 				options: { errorMessage?: string } = {},
 			) {
+				if (status === 'completed' && this.options.suppressCompletedFallback) {
+					return {
+						status,
+						visibilitySource: 'none',
+						action: 'none',
+						reason: 'completed-silent-suppressed',
+					};
+				}
+
 				if (status === 'errored') {
 					return {
 						status,
@@ -626,7 +641,11 @@ type TerminalGuardOrderServiceInternals = {
 		threadId: string,
 		runId: string,
 		status: 'completed' | 'cancelled' | 'errored',
-		options?: { messageGroupId?: string; errorMessage?: string },
+		options?: {
+			messageGroupId?: string;
+			errorMessage?: string;
+			suppressCompletedFallback?: boolean;
+		},
 	) => { action: string; reason: string } | undefined;
 	evaluateWaitingResponse: (
 		threadId: string,
@@ -2046,6 +2065,19 @@ describe('InstanceAiService — terminal response guard wiring', () => {
 		]);
 	});
 
+	it('does not publish completed fallback when a follow-up run is intentionally silent', () => {
+		const service = createTerminalGuardOrderService();
+
+		const decision = service.evaluateTerminalResponse('thread-a', 'run-1', 'completed', {
+			messageGroupId: 'group-1',
+			suppressCompletedFallback: true,
+		});
+		service.publishRunFinish('thread-a', 'run-1', 'completed');
+
+		expect(decision?.reason).toBe('completed-silent-suppressed');
+		expect(service.eventBus.events.map((event) => event.type)).toEqual(['run-finish']);
+	});
+
 	it('publishes fallback error before run-finish on a silent failed run', () => {
 		const service = createTerminalGuardOrderService();
 
@@ -2178,6 +2210,7 @@ describe('InstanceAiService — terminal response guard wiring', () => {
 			'build-1',
 			undefined,
 		);
+		expect(service.eventBus.events.map((event) => event.type)).toEqual(['run-finish']);
 		expect(service.schedulePlannedTasks).not.toHaveBeenCalled();
 	});
 
