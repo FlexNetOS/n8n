@@ -16,9 +16,16 @@ import { WorkflowCreationService } from '@/workflows/workflow-creation.service';
 
 import { WorkflowSerializer } from '../entities/workflow/workflow.serializer';
 import { TarPackageReader } from '../io/tar/tar-package-reader';
-import type { ImportPackageRequest, ImportResult } from '../n8n-packages.types';
-import { packageManifestSchema } from '../spec/manifest.schema';
+import type {
+	CredentialMatchingMode,
+	ImportPackageRequest,
+	ImportPreflight,
+	ImportResult,
+	PreparedWorkflow,
+} from '../n8n-packages.types';
+import { packageManifestSchema, type PackageManifest } from '../spec/manifest.schema';
 import type { SerializedWorkflow } from '../spec/serialized/workflow.schema';
+import { CredentialResolver } from '../entities/credentials/credential.resolver';
 
 const MEGABYTE_IN_BYTES = 1024 * 1024;
 
@@ -27,9 +34,11 @@ interface ImportTarget {
 	folderId: string | null;
 }
 
-interface PreparedWorkflow {
-	entity: WorkflowEntity;
-	sourceId: string;
+interface ImportRunContext {
+	manifest: PackageManifest;
+	target: ImportTarget;
+	project: Project;
+	credentialMatchingMode: CredentialMatchingMode;
 }
 
 @Service()
@@ -38,6 +47,7 @@ export class ImportPipeline {
 
 	constructor(
 		private readonly workflowSerializer: WorkflowSerializer,
+		private readonly credentialResolver: CredentialResolver,
 		private readonly workflowCreationService: WorkflowCreationService,
 		globalConfig: GlobalConfig,
 		private readonly projectRepository: ProjectRepository,
@@ -51,16 +61,58 @@ export class ImportPipeline {
 	async run(request: ImportPackageRequest): Promise<ImportResult> {
 		const reader = new TarPackageReader(request.packageBuffer, this.maxUncompressedPackageBytes);
 
+		const context = await this.loadImportContext(request, reader);
+		const preflight = await this.runPreflight(context, reader, request.user);
+		const created = await this.persistWorkflows(preflight.prepared, request.user, context.target);
+
+		this.emitWorkflowsImported(request.user, context, preflight, created);
+
+		return this.buildImportResult(context, preflight, created);
+	}
+
+	private async loadImportContext(
+		request: ImportPackageRequest,
+		reader: TarPackageReader,
+	): Promise<ImportRunContext> {
 		const manifest = await this.loadPackageManifest(reader);
+		const { target, project } = await this.resolveTarget(
+			request.user,
+			request.projectId,
+			request.folderId,
+		);
 
-		const { target } = await this.resolveTarget(request.user, request.projectId, request.folderId);
+		return {
+			manifest,
+			target,
+			project,
+			credentialMatchingMode: request.credentialMatchingMode ?? 'id-only',
+		};
+	}
 
-		// Validates every workflow first so a malformed package aborts before the first DB write.
-		const prepared = await this.prepareWorkflows(manifest.workflows ?? [], reader);
+	private async runPreflight(
+		context: ImportRunContext,
+		reader: TarPackageReader,
+		user: User,
+	): Promise<ImportPreflight> {
+		const prepared = await this.prepareWorkflows(context.manifest.workflows ?? [], reader);
 
+		return await this.credentialResolver.resolveForImport(
+			prepared,
+			context.manifest.requirements?.credentials,
+			context.credentialMatchingMode,
+			context.project,
+			user,
+		);
+	}
+
+	private async persistWorkflows(
+		prepared: PreparedWorkflow[],
+		user: User,
+		target: ImportTarget,
+	): Promise<WorkflowEntity[]> {
 		const created: WorkflowEntity[] = [];
 		for (const { entity, sourceId } of prepared) {
-			const saved = await this.workflowCreationService.createWorkflow(request.user, entity, {
+			const saved = await this.workflowCreationService.createWorkflow(user, entity, {
 				projectId: target.projectId,
 				parentFolderId: target.folderId ?? undefined,
 				publicApi: true,
@@ -69,29 +121,45 @@ export class ImportPipeline {
 			});
 			created.push(saved);
 		}
+		return created;
+	}
 
+	private emitWorkflowsImported(
+		user: User,
+		context: ImportRunContext,
+		preflight: ImportPreflight,
+		created: WorkflowEntity[],
+	): void {
 		this.eventService.emit('workflows-imported', {
-			user: request.user,
-			projectId: target.projectId,
+			user,
+			projectId: context.target.projectId,
 			workflowIds: created.map((w) => w.id),
-			packageSourceId: manifest.sourceId,
-			packageVersion: manifest.packageFormatVersion,
+			packageSourceId: context.manifest.sourceId,
+			packageVersion: context.manifest.packageFormatVersion,
+			matchedCredentialIds: preflight.credentialPlan.matched.map((m) => m.targetId),
 		});
+	}
 
+	private buildImportResult(
+		context: ImportRunContext,
+		preflight: ImportPreflight,
+		created: WorkflowEntity[],
+	): ImportResult {
 		return {
 			package: {
-				sourceN8nVersion: manifest.sourceN8nVersion,
-				sourceId: manifest.sourceId,
-				exportedAt: manifest.exportedAt,
+				sourceN8nVersion: context.manifest.sourceN8nVersion,
+				sourceId: context.manifest.sourceId,
+				exportedAt: context.manifest.exportedAt,
 			},
 			workflows: created.map((w) => ({
 				sourceId: w.sourceWorkflowId ?? '',
 				localId: w.id,
 				name: w.name,
-				projectId: target.projectId,
+				projectId: context.target.projectId,
 				parentFolderId: w.parentFolder?.id ?? null,
 				activeVersionId: w.activeVersionId ?? null,
 			})),
+			credentials: { matched: preflight.credentialPlan.matched },
 		};
 	}
 

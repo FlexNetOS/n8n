@@ -49,9 +49,8 @@ post:
                 - id-only
               default: id-only
               description: >
-                How credential references are matched on the target instance (from
-                `requirements.credentials` when that list is non-empty, otherwise from
-                workflow nodes). Only `id-only` is supported today.
+                How credential references in `requirements.credentials` are matched on
+                the target instance. Only `id-only` is supported today.
   responses:
     '200':
       description: Import succeeded.
@@ -124,9 +123,7 @@ post:
                       properties:
                         sourceId:
                           type: string
-                          description: >
-                            Credential id from the package (`requirements.credentials`
-                            or workflow nodes, depending on the manifest).
+                          description: Credential id from `requirements.credentials` in the package manifest.
                         targetId:
                           type: string
                           description: Matched credential id on the target instance.

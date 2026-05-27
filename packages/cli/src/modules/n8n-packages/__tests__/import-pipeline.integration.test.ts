@@ -2,8 +2,6 @@ import { LicenseState } from '@n8n/backend-common';
 import { createTeamProject, testDb, testModules } from '@n8n/backend-test-utils';
 import { ProjectRepository, SharedWorkflowRepository, WorkflowRepository } from '@n8n/db';
 import { Container } from '@n8n/di';
-import type { Readable } from 'node:stream';
-
 import { BadRequestError } from '@/errors/response-errors/bad-request.error';
 import { EventService } from '@/events/event.service';
 
@@ -14,89 +12,26 @@ import { LicenseMocker } from '@test-integration/license';
 import { N8nPackagesService } from '../n8n-packages.service';
 import { TarPackageWriter } from '../io/tar/tar-package-writer';
 import { FORMAT_VERSION } from '../spec/constants';
-import type { PackageManifest } from '../spec/manifest.schema';
 import type { SerializedWorkflow } from '../spec/serialized/workflow.schema';
 
-async function streamToBuffer(stream: Readable): Promise<Buffer> {
-	const chunks: Buffer[] = [];
-	for await (const chunk of stream) {
-		chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as ArrayBuffer));
-	}
-	return Buffer.concat(chunks);
-}
-
-const validWorkflow = (id: string, name: string): SerializedWorkflow => ({
-	id,
-	name,
-	nodes: [
-		{
-			id: 'manual-trigger',
-			name: 'Manual Trigger',
-			type: 'n8n-nodes-base.manualTrigger',
-			typeVersion: 1,
-			position: [0, 0],
-			parameters: {},
-		},
-	],
-	connections: {},
-	versionId: 'wire-version-id',
-	parentFolderId: null,
-	active: false,
-	isArchived: false,
-});
+import { buildImportPackageBuffer, serializedWorkflow } from './fixtures/package-fixtures';
+import { streamToBuffer } from './utils/tar-support';
 
 /**
  * Workflow with a structurally invalid connection: the source node referenced
  * by `connections` does not exist in `nodes`. `validateWorkflowStructure`
  * rejects this during the pipeline's pre-pass.
  */
-const brokenWorkflow = (id: string, name: string): SerializedWorkflow => ({
-	id,
-	name,
-	nodes: [
-		{
-			id: 'manual-trigger',
-			name: 'Manual Trigger',
-			type: 'n8n-nodes-base.manualTrigger',
-			typeVersion: 1,
-			position: [0, 0],
-			parameters: {},
+const brokenWorkflow = (id: string, name: string): SerializedWorkflow =>
+	serializedWorkflow({
+		id,
+		name,
+		connections: {
+			'Phantom Node That Does Not Exist': {
+				main: [[{ node: 'Manual Trigger', type: 'main', index: 0 }]],
+			},
 		},
-	],
-	connections: {
-		'Phantom Node That Does Not Exist': {
-			main: [[{ node: 'Manual Trigger', type: 'main', index: 0 }]],
-		},
-	},
-	versionId: 'wire-version-id',
-	parentFolderId: null,
-	active: false,
-	isArchived: false,
-});
-
-async function buildPackage(workflows: SerializedWorkflow[]): Promise<Buffer> {
-	const writer = new TarPackageWriter();
-
-	const manifest: PackageManifest = {
-		packageFormatVersion: FORMAT_VERSION,
-		exportedAt: new Date().toISOString(),
-		sourceN8nVersion: '1.0.0',
-		sourceId: 'integration-test-source',
-		workflows: workflows.map((w, idx) => ({
-			id: w.id,
-			name: w.name,
-			target: `workflows/wf-${idx}`,
-		})),
-	};
-
-	writer.writeFile('manifest.json', JSON.stringify(manifest));
-	workflows.forEach((wf, idx) => {
-		writer.writeDirectory(`workflows/wf-${idx}`);
-		writer.writeFile(`workflows/wf-${idx}/workflow.json`, JSON.stringify(wf));
 	});
-
-	return await streamToBuffer(writer.finalize());
-}
 
 const licenseMocker = new LicenseMocker();
 
@@ -121,10 +56,10 @@ describe('ImportPipeline batch validation', () => {
 			owner.id,
 		);
 
-		const tarBuffer = await buildPackage([
-			validWorkflow('wf-source-1', 'Good Workflow'),
+		const tarBuffer = await buildImportPackageBuffer([
+			serializedWorkflow({ id: 'wf-source-1', name: 'Good Workflow' }),
 			brokenWorkflow('wf-source-2', 'Broken Workflow'),
-			validWorkflow('wf-source-3', 'Never Reached'),
+			serializedWorkflow({ id: 'wf-source-3', name: 'Never Reached' }),
 		]);
 
 		const workflowRepo = Container.get(WorkflowRepository);
@@ -153,9 +88,9 @@ describe('ImportPipeline batch validation', () => {
 			owner.id,
 		);
 
-		const tarBuffer = await buildPackage([
-			validWorkflow('wf-source-1', 'First'),
-			validWorkflow('wf-source-2', 'Second'),
+		const tarBuffer = await buildImportPackageBuffer([
+			serializedWorkflow({ id: 'wf-source-1', name: 'First' }),
+			serializedWorkflow({ id: 'wf-source-2', name: 'Second' }),
 		]);
 
 		const result = await Container.get(N8nPackagesService).importPackage({
@@ -164,6 +99,7 @@ describe('ImportPipeline batch validation', () => {
 		});
 
 		expect(result.workflows).toHaveLength(2);
+		expect(result.credentials).toEqual({ matched: [] });
 
 		const workflowRepo = Container.get(WorkflowRepository);
 		const sharedRepo = Container.get(SharedWorkflowRepository);
@@ -181,7 +117,9 @@ describe('ImportPipeline batch validation', () => {
 
 describe('ImportPipeline routing matrix', () => {
 	async function singleWorkflowPackage(): Promise<Buffer> {
-		return await buildPackage([validWorkflow('wf-routed', 'Routed Workflow')]);
+		return await buildImportPackageBuffer([
+			serializedWorkflow({ id: 'wf-routed', name: 'Routed Workflow' }),
+		]);
 	}
 
 	it("lands in the importer's personal project root when no projectId is given", async () => {
@@ -271,7 +209,7 @@ describe('ImportPipeline routing matrix', () => {
 
 describe('ImportPipeline rejection cases', () => {
 	async function singleWorkflowPackage(): Promise<Buffer> {
-		return await buildPackage([validWorkflow('wf-x', 'X')]);
+		return await buildImportPackageBuffer([serializedWorkflow({ id: 'wf-x', name: 'X' })]);
 	}
 
 	it('rejects packages with an invalid manifest', async () => {
@@ -353,7 +291,10 @@ describe('ImportPipeline rejection cases', () => {
 			}),
 		);
 		writer.writeDirectory('workflows/wf-x');
-		writer.writeFile('workflows/wf-x/workflow.json', JSON.stringify(validWorkflow('wf-x', 'X')));
+		writer.writeFile(
+			'workflows/wf-x/workflow.json',
+			JSON.stringify(serializedWorkflow({ id: 'wf-x', name: 'X' })),
+		);
 
 		await expect(
 			Container.get(N8nPackagesService).importPackage({
@@ -396,9 +337,9 @@ describe('ImportPipeline event emission', () => {
 		try {
 			await Container.get(N8nPackagesService).importPackage({
 				user: owner,
-				packageBuffer: await buildPackage([
-					validWorkflow('wf-event-1', 'Event One'),
-					validWorkflow('wf-event-2', 'Event Two'),
+				packageBuffer: await buildImportPackageBuffer([
+					serializedWorkflow({ id: 'wf-event-1', name: 'Event One' }),
+					serializedWorkflow({ id: 'wf-event-2', name: 'Event Two' }),
 				]),
 			});
 
@@ -411,8 +352,12 @@ describe('ImportPipeline event emission', () => {
 			).toBe(true);
 			expect(importedEvents).toHaveLength(1);
 
-			const importedPayload = importedEvents[0][1] as { workflowIds: string[] };
+			const importedPayload = importedEvents[0][1] as {
+				workflowIds: string[];
+				matchedCredentialIds: string[];
+			};
 			expect(importedPayload.workflowIds).toHaveLength(2);
+			expect(importedPayload.matchedCredentialIds).toEqual([]);
 		} finally {
 			emitSpy.mockRestore();
 		}
@@ -427,8 +372,8 @@ describe('ImportPipeline event emission', () => {
 			await expect(
 				Container.get(N8nPackagesService).importPackage({
 					user: owner,
-					packageBuffer: await buildPackage([
-						validWorkflow('wf-good', 'Good'),
+					packageBuffer: await buildImportPackageBuffer([
+						serializedWorkflow({ id: 'wf-good', name: 'Good' }),
 						brokenWorkflow('wf-broken', 'Broken'),
 					]),
 				}),
