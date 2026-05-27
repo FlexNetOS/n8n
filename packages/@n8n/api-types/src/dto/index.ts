@@ -206,6 +206,13 @@ export {
 	ImportPackageRequestDto,
 	IMPORT_PACKAGE_REQUEST_FORM_FIELDS,
 } from './packages/import-package-request.dto';
+export {
+	CREDENTIAL_RESOLUTION_FAILED_CODE,
+	type CredentialResolutionFailure,
+	type CredentialResolutionFailureKind,
+	type CredentialResolutionFailedMeta,
+	type CredentialResolutionFailedApiError,
+} from './packages/credential-resolution-error';
 
 export * from './evaluations';
 

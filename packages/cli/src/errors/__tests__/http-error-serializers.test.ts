@@ -3,6 +3,9 @@ import {
 	serializeInternalRestError,
 	serializePublicApiError,
 } from '@/errors/http-error-serializers';
+import { CREDENTIAL_RESOLUTION_FAILED_CODE } from '@n8n/api-types';
+
+import { CredentialResolutionFailedError } from '@/modules/n8n-packages/entities/credentials/credential.resolver';
 import { NotFoundError } from '@/errors/response-errors/not-found.error';
 import { UnexpectedError, UserError } from 'n8n-workflow';
 
@@ -22,6 +25,39 @@ describe('http-error-serializers', () => {
 			body: {
 				code: 404,
 				message: 'x',
+			},
+		});
+	});
+
+	it('serializePublicApiError: spreads meta for CredentialResolutionFailedError', () => {
+		const descriptor = classifyHttpError(
+			new CredentialResolutionFailedError('1 credential reference could not be resolved.', {
+				code: CREDENTIAL_RESOLUTION_FAILED_CODE,
+				failures: [
+					{
+						kind: 'not_found',
+						sourceId: 'cred-1',
+						sourceName: 'HTTP',
+						sourceType: 'httpBasicAuth',
+						usedByWorkflows: ['wf-1'],
+					},
+				],
+			}),
+		);
+		expect(serializePublicApiError(descriptor)).toEqual({
+			status: 422,
+			body: {
+				message: '1 credential reference could not be resolved.',
+				code: CREDENTIAL_RESOLUTION_FAILED_CODE,
+				failures: [
+					{
+						kind: 'not_found',
+						sourceId: 'cred-1',
+						sourceName: 'HTTP',
+						sourceType: 'httpBasicAuth',
+						usedByWorkflows: ['wf-1'],
+					},
+				],
 			},
 		});
 	});
