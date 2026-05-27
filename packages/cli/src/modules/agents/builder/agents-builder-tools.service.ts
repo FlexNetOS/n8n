@@ -121,10 +121,9 @@ export class AgentsBuilderToolsService {
 		projectId: string,
 		credentialProvider: CredentialProvider,
 		user: User,
-		enabledModules?: ReadonlyArray<string>,
 	): BuilderTools {
 		return {
-			json: this.getJsonTools(agentId, projectId, credentialProvider, user, enabledModules),
+			json: this.getJsonTools(agentId, projectId, credentialProvider, user),
 			shared: this.getSharedTools(agentId, projectId, credentialProvider),
 		};
 	}
@@ -134,7 +133,6 @@ export class AgentsBuilderToolsService {
 		projectId: string,
 		credentialProvider: CredentialProvider,
 		user: User,
-		enabledModules?: ReadonlyArray<string>,
 	): BuiltTool[] {
 		const readConfigTool = new Tool(BUILDER_TOOLS.READ_CONFIG)
 			.description(
@@ -357,18 +355,13 @@ export class AgentsBuilderToolsService {
 			buildAskCredentialTool({ credentialProvider }),
 			buildAskLlmTool(),
 			buildAskQuestionTool(),
+			buildVerifyMcpServerTool({
+				credentialProvider,
+				oauthService: this.oauthService,
+				projectId,
+			}),
+			buildSearchMcpServersTool({ mcpRegistryService: this.mcpRegistryService }),
 		];
-
-		if (enabledModules?.includes('mcp')) {
-			tools.push(
-				buildVerifyMcpServerTool({
-					credentialProvider,
-					oauthService: this.oauthService,
-					projectId,
-				}),
-			);
-			tools.push(buildSearchMcpServersTool({ mcpRegistryService: this.mcpRegistryService }));
-		}
 
 		return tools;
 	}

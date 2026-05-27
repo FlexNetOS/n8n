@@ -161,6 +161,7 @@ describe('builder model recommendations', () => {
 	it('registers only optional builder runtime skills', () => {
 		expect(getBuilderRuntimeSkills({ enabledModules: [] }).map((skill) => skill.id)).toEqual([
 			'agent-builder-integrations',
+			'agent-builder-mcp',
 			'agent-builder-target-skills',
 		]);
 	});
