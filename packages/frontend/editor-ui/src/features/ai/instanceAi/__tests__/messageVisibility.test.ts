@@ -7,10 +7,11 @@ function assistantMessage(content: string): InstanceAiMessage {
 	return {
 		id: 'msg-1',
 		role: 'assistant',
+		createdAt: new Date(0).toISOString(),
 		content,
+		reasoning: '',
 		isStreaming: false,
-		agentTree: null,
-	} as InstanceAiMessage;
+	};
 }
 
 describe('messageHasVisibleContent', () => {

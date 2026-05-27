@@ -699,8 +699,20 @@ describe('PlannedTaskCoordinator', () => {
 				const graph = makeGraph({
 					tasks: [
 						makeTaskRecord({ id: 'a', deps: [], status: 'succeeded' }),
-						makeTaskRecord({ id: 'b', kind: 'research', deps: ['a'], status: 'planned' }),
-						makeTaskRecord({ id: 'c', kind: 'delegate', deps: ['a'], status: 'planned' }),
+						makeTaskRecord({
+							id: 'b',
+							kind: 'delegate',
+							deps: ['a'],
+							status: 'planned',
+							tools: ['nodes'],
+						}),
+						makeTaskRecord({
+							id: 'c',
+							kind: 'delegate',
+							deps: ['a'],
+							status: 'planned',
+							tools: ['workflows'],
+						}),
 					],
 				});
 				return await Promise.resolve(updater(graph));
@@ -873,9 +885,19 @@ describe('PlannedTaskCoordinator', () => {
 			storage.update.mockImplementation(async (_threadId, updater) => {
 				const graph = makeGraph({
 					tasks: [
-						makeTaskRecord({ id: 'a', kind: 'research', status: 'planned' }),
-						makeTaskRecord({ id: 'b', kind: 'delegate', status: 'planned' }),
-						makeTaskRecord({ id: 'c', kind: 'research', status: 'planned' }),
+						makeTaskRecord({ id: 'a', kind: 'delegate', status: 'planned', tools: ['nodes'] }),
+						makeTaskRecord({
+							id: 'b',
+							kind: 'delegate',
+							status: 'planned',
+							tools: ['workflows'],
+						}),
+						makeTaskRecord({
+							id: 'c',
+							kind: 'delegate',
+							status: 'planned',
+							tools: ['credentials'],
+						}),
 					],
 				});
 				return await Promise.resolve(updater(graph));

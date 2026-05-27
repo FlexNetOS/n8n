@@ -148,7 +148,6 @@ function isWorkflowSaveTool(trace: Pick<IAToolCallTrace, 'toolName' | 'args'>): 
 	const args = isRecord(trace.args) ? trace.args : {};
 	return (
 		trace.toolName === 'build-workflow' ||
-		trace.toolName === 'submit-workflow' ||
 		(trace.toolName === 'workflows' && (args.action === 'create' || args.action === 'update'))
 	);
 }
@@ -713,8 +712,6 @@ function summarizeToolCallArgs(toolName: string, args: unknown): string {
 			return trunc(str(a.path));
 		case 'build-workflow':
 			return trunc(`${str(a.action)} ${str(a.workflowId)}`);
-		case 'submit-workflow':
-			return trunc(`${str(a.name)} ${str(a.filePath)}`);
 		case 'verify-built-workflow':
 			return trunc(str(a.workflowId) || str(a.workItemId));
 		case 'credentials':

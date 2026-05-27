@@ -13,6 +13,7 @@ import { computed, nextTick, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { INSTANCE_AI_VIEW, INSTANCE_AI_THREAD_VIEW } from '../constants';
 import { useInstanceAiStore } from '../instanceAi.store';
+import { getRelativeDate, RELATIVE_DATE_GROUPS } from '../../shared/dateGroups';
 
 const emit = defineEmits<{ collapse: [] }>();
 
@@ -48,29 +49,6 @@ const dateGroupI18nMap: Record<string, string> = {
 	Older: i18n.baseText('instanceAi.sidebar.group.older'),
 };
 
-const groupOrder = ['Today', 'Yesterday', 'This week', 'Older'] as const;
-
-function getRelativeDate(now: Date, dateString: string): string {
-	const date = new Date(dateString);
-	const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-	const yesterday = new Date(today);
-	yesterday.setDate(yesterday.getDate() - 1);
-	const lastWeek = new Date(today);
-	lastWeek.setDate(lastWeek.getDate() - 7);
-
-	const threadDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-	if (threadDate.getTime() === today.getTime()) {
-		return 'Today';
-	} else if (threadDate.getTime() === yesterday.getTime()) {
-		return 'Yesterday';
-	} else if (threadDate >= lastWeek) {
-		return 'This week';
-	} else {
-		return 'Older';
-	}
-}
-
 const groupedThreads = computed(() => {
 	const now = new Date();
 	const groups = new Map<string, typeof store.threads>();
@@ -88,7 +66,7 @@ const groupedThreads = computed(() => {
 		threads.push(thread);
 	}
 
-	return groupOrder.flatMap((groupName) => {
+	return RELATIVE_DATE_GROUPS.flatMap((groupName) => {
 		const threads = groups.get(groupName) ?? [];
 		return threads.length > 0 ? [{ label: dateGroupI18nMap[groupName] ?? groupName, threads }] : [];
 	});

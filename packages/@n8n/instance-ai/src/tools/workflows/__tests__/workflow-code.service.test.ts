@@ -449,7 +449,7 @@ describe('workflow code create/update approval flow', () => {
 				connections: {},
 			},
 			warnings: [],
-		} as ReturnType<typeof parseAndValidate>);
+		} as unknown as ReturnType<typeof parseAndValidate>);
 		const ctx = makeContext({ createWorkflow: 'always_allow' });
 		const service = createWorkflowCodeService(ctx);
 		const { context } = makeToolContext();
@@ -501,6 +501,73 @@ describe('workflow code create/update approval flow', () => {
 			verificationReadiness: { status: 'ready' },
 			setupRequirement: { status: 'not_required' },
 		});
+	});
+
+	it('does not keep mocked credential metadata for stale credentials stripped before save', async () => {
+		mockedParseAndValidate.mockReturnValueOnce({
+			workflow: {
+				name: 'HTTP without auth',
+				nodes: [
+					{
+						id: 'manual',
+						name: 'Manual Trigger',
+						type: 'n8n-nodes-base.manualTrigger',
+						typeVersion: 1,
+						position: [0, 0],
+						parameters: {},
+					},
+					{
+						id: 'http',
+						name: 'HTTP Request',
+						type: 'n8n-nodes-base.httpRequest',
+						typeVersion: 4.2,
+						position: [100, 0],
+						parameters: { authentication: 'none' },
+						credentials: {
+							httpHeaderAuth: undefined as unknown as { id: string; name: string },
+						},
+					},
+				],
+				connections: {},
+			},
+			warnings: [],
+		});
+		const ctx = makeContext(
+			{ createWorkflow: 'always_allow' },
+			{
+				nodeService: {
+					listAvailable: jest.fn().mockResolvedValue([]),
+					getDescription: jest.fn().mockResolvedValue({ credentials: [], inputs: [], outputs: [] }),
+					listSearchable: jest.fn().mockResolvedValue([]),
+					getNodeCredentialTypes: jest.fn().mockResolvedValue([]),
+				},
+			},
+		);
+		const service = createWorkflowCodeService(ctx);
+		const { context } = makeToolContext();
+
+		const result = await service.create(
+			{ action: 'create', code: validCode, name: 'HTTP without auth' },
+			context,
+		);
+
+		expect(result).toMatchObject({
+			success: true,
+			workflowId: 'created-wf',
+			setupRequirement: { status: 'not_required' },
+		});
+		expect('mockedCredentialTypes' in result).toBe(false);
+		expect('mockedCredentialsByNode' in result).toBe(false);
+		expect('verificationPinData' in result).toBe(false);
+		expect(ctx.workflowService.createFromWorkflowJSON).toHaveBeenCalledWith(
+			expect.objectContaining({
+				nodes: [
+					expect.objectContaining({ name: 'Manual Trigger' }),
+					expect.objectContaining({ name: 'HTTP Request', credentials: undefined }),
+				],
+			}),
+			{},
+		);
 	});
 
 	it('keeps mocked outbound credentials verifiable before setup when the trigger is mockable', async () => {

@@ -794,7 +794,7 @@ function createTerminalGuardOrderService(): TerminalGuardOrderServiceInternals {
 function makeToolEvent(
 	type: 'tool-call' | 'tool-result' | 'confirmation-request',
 	runId: string,
-	toolCallId: string,
+	_toolCallId: string,
 	payload: Record<string, unknown>,
 ): InstanceAiEvent {
 	return {

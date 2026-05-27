@@ -345,6 +345,7 @@ function createPendingUserInputMessage(message: AgentDbMessage): PendingUserInpu
 	const metadata = 'metadata' in message && isRecord(message.metadata) ? message.metadata : {};
 	return {
 		...message,
+		id: `msg_${nanoid()}`,
 		metadata: {
 			...metadata,
 			n8nPendingUserInput: true,
@@ -3469,13 +3470,14 @@ export class InstanceAiService {
 					})),
 				]);
 				streamInput = nonStructuredAttachments.length > 0 ? [userInputMessage] : fullMessage;
+				const pendingUserInputMessage = createPendingUserInputMessage(userInputMessage);
 				// Hydrate the visible user turn during active runs, without feeding it back as history.
 				await memory.saveMessages({
 					threadId,
 					resourceId: user.id,
-					messages: [createPendingUserInputMessage(userInputMessage)],
+					messages: [pendingUserInputMessage],
 				});
-				this.getPendingUserInputMessageMap().set(runId, userInputMessage.id);
+				this.getPendingUserInputMessageMap().set(runId, pendingUserInputMessage.id);
 
 				if (promptBuildRun && tracing) {
 					// Redact raw attachment data from trace output — log metadata only

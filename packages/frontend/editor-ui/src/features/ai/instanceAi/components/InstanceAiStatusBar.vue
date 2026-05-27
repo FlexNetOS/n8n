@@ -18,7 +18,7 @@ function getAgentRoleLabel(role: string): string {
 		return i18n.baseText('instanceAi.statusBar.workflowBuilder');
 	}
 
-	return role;
+	return i18n.baseText('instanceAi.statusBar.thinking');
 }
 
 function deriveActivity(messages: InstanceAiMessage[]): { label: string; detail?: string } | null {

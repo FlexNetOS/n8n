@@ -11,7 +11,7 @@ vi.mock('../components/InstanceAiMarkdownChunk.vue', () => ({
 		props: ['source'],
 		computed: {
 			markdownLink(): { text: string; href: string } | undefined {
-				const source = (this as { source: { type: string; content?: string } }).source;
+				const source = (this as unknown as { source: { type: string; content?: string } }).source;
 				if (source.type !== 'text' || !source.content) return undefined;
 				const match = /\[([^\]]+)\]\(([^)]+)\)/.exec(source.content);
 				return match ? { text: match[1], href: match[2] } : undefined;

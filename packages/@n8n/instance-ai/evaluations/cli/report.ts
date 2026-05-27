@@ -202,7 +202,6 @@ function isWorkflowSaveTool(trace: Pick<ToolCallTrace, 'toolName' | 'args'>): bo
 	const args = isRecord(trace.args) ? trace.args : {};
 	return (
 		trace.toolName === 'build-workflow' ||
-		trace.toolName === 'submit-workflow' ||
 		(trace.toolName === 'workflows' && (args.action === 'create' || args.action === 'update'))
 	);
 }

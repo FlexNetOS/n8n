@@ -937,16 +937,15 @@ export function createWorkflowCodeService(context: InstanceAiContext) {
 			};
 		}
 
+		// Drop credential entries that are no longer valid for the current
+		// parameters before resolving credentials so stale keys do not produce
+		// setup or verification metadata.
+		await stripStaleCredentialsFromWorkflow(context, json);
+
 		// Resolve undefined/null credentials before saving.
 		// newCredential() produces NewCredentialImpl which serializes to undefined.
 		const credentialMap = await buildCredentialMap(context.credentialService);
 		const mockResult = await resolveCredentials(json, workflowId, context, credentialMap);
-
-		// Strip credential entries that are no longer valid for the current
-		// parameters. Resolution above (and the LLM itself) can re-emit stale
-		// references between turns; without this, setup analysis would surface
-		// a credential request for a node that no longer needs one.
-		await stripStaleCredentialsFromWorkflow(context, json);
 
 		// Ensure webhook nodes have a webhookId so n8n registers clean paths
 		await ensureWebhookIds(json, workflowId, context);
