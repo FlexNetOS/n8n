@@ -146,6 +146,7 @@ describe('materializeRuntimeSkillsIntoWorkspace', () => {
 			path: skillPath,
 			directory: skillDir,
 		});
+		expect(registry.skills[0]).not.toHaveProperty('sourcePath');
 
 		const manifest = jsonParse<{ schemaVersion: number; skillsHash: string }>(
 			bundle.files.get(manifestPath) ?? '{}',
@@ -184,6 +185,7 @@ describe('materializeRuntimeSkillsIntoWorkspace', () => {
 			path: skillPath,
 			directory: skillDir,
 		});
+		expect(registry.skills[0]).not.toHaveProperty('sourcePath');
 		const manifestContent = writes.get(manifestPath);
 		if (!manifestContent) throw new Error('Expected runtime skill manifest to be written');
 		const manifest = jsonParse<{ schemaVersion: number; skillsHash: string }>(manifestContent);
