@@ -13,12 +13,16 @@ import type { ResourceEntry } from '../useResourceRegistry';
 // ---------------------------------------------------------------------------
 
 function makeToolCall(overrides: Partial<InstanceAiToolCallState>): InstanceAiToolCallState {
+	const defaultArgs =
+		overrides.toolName === 'workflows'
+			? { action: 'create', ...(overrides.args ?? {}) }
+			: (overrides.args ?? {});
 	return {
 		toolCallId: 'tc-1',
 		toolName: 'some-tool',
-		args: {},
 		isLoading: false,
 		...overrides,
+		args: defaultArgs,
 	};
 }
 
@@ -283,7 +287,7 @@ describe('useCanvasPreview', () => {
 						toolCalls: [
 							makeToolCall({
 								toolCallId: 'tc-build',
-								toolName: 'build-workflow',
+								toolName: 'workflows',
 								result: { success: true, workflowId: 'wf-historical' },
 							}),
 						],
@@ -297,6 +301,65 @@ describe('useCanvasPreview', () => {
 	});
 
 	describe('auto-open on build result', () => {
+		test('auto-opens existing workflow preview when a direct workflow update starts', async () => {
+			const ctx = setup();
+			ctx.thread.isStreaming = true;
+
+			ctx.thread.messages = [
+				makeMessage({
+					agentTree: makeAgentNode({
+						toolCalls: [
+							makeToolCall({
+								toolCallId: 'tc-update',
+								toolName: 'workflows',
+								args: {
+									action: 'update',
+									workflowId: 'wf-existing',
+									name: 'Existing workflow',
+								},
+								isLoading: true,
+							}),
+						],
+					}),
+				}),
+			];
+			await nextTick();
+
+			expect(ctx.activeWorkflowId.value).toBe('wf-existing');
+			expect(ctx.isPreviewVisible.value).toBe(true);
+			expect(ctx.allArtifactTabs.value).toEqual([
+				expect.objectContaining({
+					id: 'wf-existing',
+					type: 'workflow',
+					name: 'Existing workflow',
+				}),
+			]);
+		});
+
+		test('does not auto-open active workflow update targets while hydrating', async () => {
+			const ctx = setup();
+			ctx.thread.isHydratingThread = true;
+
+			ctx.thread.messages = [
+				makeMessage({
+					agentTree: makeAgentNode({
+						toolCalls: [
+							makeToolCall({
+								toolCallId: 'tc-update',
+								toolName: 'workflows',
+								args: { action: 'update', workflowId: 'wf-historical' },
+								isLoading: true,
+							}),
+						],
+					}),
+				}),
+			];
+			await nextTick();
+
+			expect(ctx.activeTabId.value).toBeUndefined();
+			expect(ctx.isPreviewVisible.value).toBe(false);
+		});
+
 		test('auto-opens canvas when streaming and build result appears', async () => {
 			const ctx = setup();
 			ctx.thread.isStreaming = true;
@@ -308,7 +371,7 @@ describe('useCanvasPreview', () => {
 						toolCalls: [
 							makeToolCall({
 								toolCallId: 'tc-build',
-								toolName: 'build-workflow',
+								toolName: 'workflows',
 								result: { success: true, workflowId: 'wf-new' },
 							}),
 						],
@@ -333,7 +396,7 @@ describe('useCanvasPreview', () => {
 						toolCalls: [
 							makeToolCall({
 								toolCallId: 'tc-build',
-								toolName: 'build-workflow',
+								toolName: 'workflows',
 								result: { success: true, workflowId: 'wf-historical' },
 							}),
 						],
@@ -359,7 +422,7 @@ describe('useCanvasPreview', () => {
 						toolCalls: [
 							makeToolCall({
 								toolCallId: 'tc-build',
-								toolName: 'build-workflow',
+								toolName: 'workflows',
 								result: { success: true, workflowId: 'wf-1' },
 							}),
 						],
@@ -385,7 +448,7 @@ describe('useCanvasPreview', () => {
 						toolCalls: [
 							makeToolCall({
 								toolCallId: 'tc-1',
-								toolName: 'build-workflow',
+								toolName: 'workflows',
 								result: { success: true, workflowId: 'wf-1' },
 							}),
 						],
@@ -395,129 +458,6 @@ describe('useCanvasPreview', () => {
 			await nextTick();
 
 			expect(ctx.workflowRefreshKey.value).toBe(initialKey + 1);
-		});
-	});
-
-	describe('auto-open on builder spawn (edit flow)', () => {
-		test('opens canvas as soon as an edit-mode builder spawns with targetResource.id', async () => {
-			const ctx = setup();
-			registerWorkflow(ctx.thread, 'wf-existing', 'Existing WF');
-
-			ctx.thread.messages = [
-				makeMessage({
-					agentTree: makeAgentNode({
-						children: [
-							makeAgentNode({
-								agentId: 'agent-builder-1',
-								role: 'workflow-builder',
-								kind: 'builder',
-								status: 'active',
-								targetResource: { type: 'workflow', id: 'wf-existing' },
-							}),
-						],
-					}),
-				}),
-			];
-			await nextTick();
-
-			expect(ctx.activeTabId.value).toBe('wf-existing');
-			expect(ctx.activeWorkflowId.value).toBe('wf-existing');
-			expect(ctx.isPreviewVisible.value).toBe(true);
-		});
-
-		test('does not open canvas when the builder has no targetResource id (create flow)', async () => {
-			const ctx = setup();
-
-			ctx.thread.messages = [
-				makeMessage({
-					agentTree: makeAgentNode({
-						children: [
-							makeAgentNode({
-								agentId: 'agent-builder-1',
-								role: 'workflow-builder',
-								kind: 'builder',
-								status: 'active',
-								targetResource: { type: 'workflow' },
-							}),
-						],
-					}),
-				}),
-			];
-			await nextTick();
-
-			expect(ctx.activeTabId.value).toBeUndefined();
-			expect(ctx.isPreviewVisible.value).toBe(false);
-		});
-
-		test('does not open canvas while hydrating historical messages', async () => {
-			const ctx = setup();
-			ctx.thread.isHydratingThread = true;
-			registerWorkflow(ctx.thread, 'wf-historical', 'Past WF');
-
-			ctx.thread.messages = [
-				makeMessage({
-					agentTree: makeAgentNode({
-						children: [
-							makeAgentNode({
-								agentId: 'agent-builder-historical',
-								role: 'workflow-builder',
-								kind: 'builder',
-								status: 'completed',
-								targetResource: { type: 'workflow', id: 'wf-historical' },
-							}),
-						],
-					}),
-				}),
-			];
-			await nextTick();
-
-			expect(ctx.activeTabId.value).toBeUndefined();
-			expect(ctx.isPreviewVisible.value).toBe(false);
-		});
-
-		test('switches to the latest edit target when a new builder spawns', async () => {
-			const ctx = setup();
-			registerWorkflow(ctx.thread, 'wf-a', 'WF A');
-			registerWorkflow(ctx.thread, 'wf-b', 'WF B');
-
-			ctx.thread.messages = [
-				makeMessage({
-					agentTree: makeAgentNode({
-						children: [
-							makeAgentNode({
-								agentId: 'agent-builder-a',
-								role: 'workflow-builder',
-								kind: 'builder',
-								status: 'completed',
-								targetResource: { type: 'workflow', id: 'wf-a' },
-							}),
-						],
-					}),
-				}),
-			];
-			await nextTick();
-			expect(ctx.activeTabId.value).toBe('wf-a');
-
-			ctx.thread.messages = [
-				...ctx.thread.messages,
-				makeMessage({
-					id: 'msg-2',
-					agentTree: makeAgentNode({
-						children: [
-							makeAgentNode({
-								agentId: 'agent-builder-b',
-								role: 'workflow-builder',
-								kind: 'builder',
-								status: 'active',
-								targetResource: { type: 'workflow', id: 'wf-b' },
-							}),
-						],
-					}),
-				}),
-			];
-			await nextTick();
-
-			expect(ctx.activeTabId.value).toBe('wf-b');
 		});
 	});
 

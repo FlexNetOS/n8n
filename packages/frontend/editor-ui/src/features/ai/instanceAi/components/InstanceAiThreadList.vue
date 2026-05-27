@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-import { getRelativeDate } from '@/features/ai/chatHub/chat.utils';
 import {
 	N8nActionDropdown,
 	N8nIconButton,
@@ -51,14 +50,34 @@ const dateGroupI18nMap: Record<string, string> = {
 
 const groupOrder = ['Today', 'Yesterday', 'This week', 'Older'] as const;
 
+function getRelativeDate(now: Date, dateString: string): string {
+	const date = new Date(dateString);
+	const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+	const yesterday = new Date(today);
+	yesterday.setDate(yesterday.getDate() - 1);
+	const lastWeek = new Date(today);
+	lastWeek.setDate(lastWeek.getDate() - 7);
+
+	const threadDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+	if (threadDate.getTime() === today.getTime()) {
+		return 'Today';
+	} else if (threadDate.getTime() === yesterday.getTime()) {
+		return 'Yesterday';
+	} else if (threadDate >= lastWeek) {
+		return 'This week';
+	} else {
+		return 'Older';
+	}
+}
+
 const groupedThreads = computed(() => {
 	const now = new Date();
 	const groups = new Map<string, typeof store.threads>();
 
 	// Group by last activity, not creation date — a thread created weeks ago
 	// but messaged today belongs under "Today", matching the backend ordering
-	// (memory.service returns threads sorted by updatedAt desc) and the
-	// chatHub sidebar's `groupConversationsByDate` behaviour.
+	// (memory.service returns threads sorted by updatedAt desc).
 	for (const thread of store.threads) {
 		const group = getRelativeDate(now, thread.updatedAt ?? thread.createdAt);
 		let threads = groups.get(group);

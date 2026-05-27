@@ -1,8 +1,8 @@
 import { computed, ref, watch, type Ref } from 'vue';
 import type { IconName } from '@n8n/design-system';
 import {
+	getLatestActiveBuildTarget,
 	getLatestBuildResult,
-	getLatestBuilderTarget,
 	getLatestExecutionId,
 	getLatestWorkflowSetupResult,
 	getLatestDataTableResult,
@@ -39,6 +39,17 @@ export function useCanvasPreview({
 	// --- Tab state ---
 	const activeTabId = ref<string>();
 
+	const latestActiveBuildTarget = computed(() => {
+		for (let i = thread.messages.length - 1; i >= 0; i--) {
+			const msg = thread.messages[i];
+			if (msg.agentTree) {
+				const result = getLatestActiveBuildTarget(msg.agentTree);
+				if (result) return result;
+			}
+		}
+		return null;
+	});
+
 	// All artifacts (workflows + data tables) in the current thread, derived from resource registry
 	const allArtifactTabs = computed((): ArtifactTab[] => {
 		const result: ArtifactTab[] = [];
@@ -53,6 +64,16 @@ export function useCanvasPreview({
 					executionStatus: workflowExecutions?.value.get(entry.id)?.status,
 				});
 			}
+		}
+
+		const buildTarget = latestActiveBuildTarget.value;
+		if (buildTarget && !thread.producedArtifacts.has(buildTarget.workflowId)) {
+			result.push({
+				id: buildTarget.workflowId,
+				type: 'workflow',
+				name: buildTarget.name ?? `Workflow ${buildTarget.workflowId}`,
+				icon: 'workflow',
+			});
 		}
 
 		return result;
@@ -174,31 +195,13 @@ export function useCanvasPreview({
 		{ flush: 'sync' },
 	);
 
-	// --- Auto-open canvas when an edit-mode builder spawns ---
-	// The workflow-builder carries the existing workflow id in
-	// `targetResource.id` from the moment it is spawned. Opening the preview
-	// then — instead of waiting for the first build-workflow result — lets the
-	// user see what is being edited as soon as the sub-agent is called.
-	// Keyed by agentId so a fresh builder spawn re-triggers the preview.
-
-	const latestBuilderTarget = computed(() => {
-		for (let i = thread.messages.length - 1; i >= 0; i--) {
-			const msg = thread.messages[i];
-			if (msg.agentTree) {
-				const target = getLatestBuilderTarget(msg.agentTree);
-				if (target) return target;
-			}
-		}
-		return null;
-	});
-
 	watch(
-		() => latestBuilderTarget.value?.agentId,
-		(agentId) => {
-			if (!agentId || !latestBuilderTarget.value) return;
+		() => latestActiveBuildTarget.value?.toolCallId,
+		(toolCallId) => {
+			if (!toolCallId || !latestActiveBuildTarget.value) return;
 			if (thread.isHydratingThread) return;
 
-			activeTabId.value = latestBuilderTarget.value.workflowId;
+			activeTabId.value = latestActiveBuildTarget.value.workflowId;
 		},
 		{ flush: 'sync' },
 	);
