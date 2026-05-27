@@ -29,7 +29,7 @@ export function formatWorkflowLoopGuidance(
 			return (
 				`VERIFY: Run workflow ${action.workflowId}. ` +
 				`If the build had mocked credentials, use \`verify-built-workflow\` with workItemId "${options.workItemId ?? 'unknown'}". ` +
-				'Otherwise use `executions(action="run")`. ' +
+				'Otherwise use `executions(action="run", requireApproval=false)` for internal verification. ' +
 				'If it fails, use `executions(action="debug")` to diagnose. ' +
 				`Then call \`report-verification-verdict\` with workItemId "${options.workItemId ?? 'unknown'}" and your findings.`
 			);

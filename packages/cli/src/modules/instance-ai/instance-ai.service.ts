@@ -579,7 +579,7 @@ export class InstanceAiService {
 
 	private readonly pendingTerminalOutcomes = new Map<string, TerminalOutcome>();
 
-	private pendingUserInputMessageIdsByRunId?: Map<string, string> = new Map();
+	private readonly pendingUserInputMessageIdsByRunId = new Map<string, string>();
 
 	private terminalOutcomeStorage?: TerminalOutcomeStorage;
 
@@ -1146,12 +1146,16 @@ export class InstanceAiService {
 		tracing: InstanceAiTraceContext,
 		messageGroupId?: string,
 	): void {
+		const traceSlug = this.traceReplay.getActiveSlug();
 		this.traceContextsByRunId.set(runId, {
 			threadId,
 			messageGroupId,
 			tracing,
-			traceSlug: this.traceReplay.getActiveSlug(),
+			traceSlug,
 		});
+		if (traceSlug) {
+			this.traceReplay.registerRun(traceSlug, threadId, runId);
+		}
 	}
 
 	private getTraceContext(runId: string): InstanceAiTraceContext | undefined {
@@ -1811,7 +1815,65 @@ export class InstanceAiService {
 	}
 
 	getTraceEvents(slug: string): unknown[] {
+		const eventBusEvents = this.getTraceEventsFromEventBus(slug);
+		if (eventBusEvents.length > 0) return eventBusEvents;
+
 		return this.traceReplay.getEventsWithWriterFallback(slug, this.traceContextsByRunId.values());
+	}
+
+	private getTraceEventsFromEventBus(slug: string): unknown[] {
+		const syntheticEvents: Array<Record<string, unknown>> = [];
+		const callsById = new Map<string, Record<string, unknown>>();
+		let stepId = 0;
+
+		for (const { threadId, runIds } of this.traceReplay.getRegisteredRuns(slug)) {
+			const runIdSet = new Set(runIds);
+			const events = this.eventBus
+				.getEventsAfter(threadId, 0)
+				.filter(({ event }) => runIdSet.has(event.runId))
+				.map(({ event }) => event);
+
+			for (const event of events) {
+				if (event.type === 'tool-call') {
+					const traceEvent: Record<string, unknown> = {
+						kind: 'tool-call',
+						stepId: ++stepId,
+						agentRole: this.getTraceAgentRole(event.agentId),
+						toolName: event.payload.toolName,
+						toolCallId: event.payload.toolCallId,
+						input: event.payload.args,
+					};
+					callsById.set(event.payload.toolCallId, traceEvent);
+					syntheticEvents.push(traceEvent);
+				} else if (event.type === 'tool-result') {
+					const call = callsById.get(event.payload.toolCallId);
+					if (call) {
+						call.output = event.payload.result;
+					}
+				} else if (event.type === 'tool-error') {
+					const call = callsById.get(event.payload.toolCallId);
+					if (call) {
+						call.output = { success: false, error: event.payload.error };
+					}
+				} else if (event.type === 'confirmation-request') {
+					syntheticEvents.push({
+						kind: 'tool-suspend',
+						stepId: ++stepId,
+						agentRole: this.getTraceAgentRole(event.agentId),
+						toolName: event.payload.toolName,
+						toolCallId: event.payload.toolCallId,
+						input: event.payload.args,
+						suspendPayload: event.payload,
+					});
+				}
+			}
+		}
+
+		return syntheticEvents;
+	}
+
+	private getTraceAgentRole(agentId: string): string {
+		return agentId === ORCHESTRATOR_AGENT_ID ? 'orchestrator' : agentId;
 	}
 
 	activateTraceSlug(slug: string): void {
@@ -2803,7 +2865,6 @@ export class InstanceAiService {
 					error: 'Workflow build tasks must run through the orchestrator follow-up path.',
 				});
 				return;
-				break;
 			case 'delegate':
 				started = await startDetachedDelegateTask(taskContext, {
 					title: task.title,
@@ -3414,9 +3475,7 @@ export class InstanceAiService {
 					resourceId: user.id,
 					messages: [createPendingUserInputMessage(userInputMessage)],
 				});
-				if (typeof streamInput === 'string') {
-					this.getPendingUserInputMessageMap().set(runId, userInputMessage.id);
-				}
+				this.getPendingUserInputMessageMap().set(runId, userInputMessage.id);
 
 				if (promptBuildRun && tracing) {
 					// Redact raw attachment data from trace output — log metadata only
@@ -3794,7 +3853,6 @@ export class InstanceAiService {
 	}
 
 	private getPendingUserInputMessageMap(): Map<string, string> {
-		this.pendingUserInputMessageIdsByRunId ??= new Map();
 		return this.pendingUserInputMessageIdsByRunId;
 	}
 

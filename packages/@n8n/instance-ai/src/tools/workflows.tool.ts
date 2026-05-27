@@ -519,6 +519,14 @@ async function handleSetup(
 	invalidateWorkflowCode: (workflowId: string) => void,
 ) {
 	const state = getSetupState(stateByWorkflowId, input.workflowId);
+	if (context.plannedBuildTask) {
+		return {
+			success: false,
+			denied: true,
+			reason:
+				'Setup is handled by the verification checkpoint after the planned build is saved. Stop after workflows(action="create"|"update") in the build follow-up.',
+		};
+	}
 	// `setup` mutates workflow nodes via applyNodeChanges (credentials and
 	// parameters are workflow-record fields), so it's gated under
 	// `updateWorkflow` like other workflow-changing actions.

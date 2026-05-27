@@ -344,11 +344,11 @@ task has a `kind` that determines its executor:
 Standalone data-table work bypasses planned tasks: the orchestrator loads the
 `data-table-manager` skill and uses `data-tables` / `parse-file` directly.
 
-Build and delegate tasks run detached as background agents. Checkpoint
-tasks run as orchestrator follow-ups so they can inspect the latest workflow
-state before verifying. Dependencies are respected — a task only starts when all
-its `deps` have succeeded. The plan is shown to the user for approval before
-execution begins.
+Build and checkpoint tasks run as orchestrator follow-ups; workflow building
+loads the `workflow-builder` skill and saves through `workflows`. Delegate
+tasks still run detached as background agents. Dependencies are respected — a
+task only starts when all its `deps` have succeeded. The plan is shown to the
+user for approval before execution begins.
 
 ### Workflow Loop State Machine
 

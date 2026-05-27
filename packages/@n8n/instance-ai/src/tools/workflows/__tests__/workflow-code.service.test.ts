@@ -1,6 +1,7 @@
 import type { InstanceAiContext } from '../../../types';
 import type * as WorkflowCodeParserModule from '../../../workflow-builder';
 import { parseAndValidate } from '../../../workflow-builder';
+import type { WorkflowBuildOutcome } from '../../../workflow-loop/workflow-loop-state';
 import {
 	createWorkflowCodeService,
 	workflowCodeUpdateActionSchema,
@@ -106,6 +107,26 @@ describe('workflow code create/update approval flow', () => {
 		};
 	}
 
+	function makePlannedBuildTask(overrides: Record<string, unknown> = {}) {
+		return {
+			threadId: 'thread-1',
+			taskId: 'task-1',
+			workItemId: 'wi-1',
+			title: 'Build workflow',
+			spec: 'Build it',
+			plannedTaskService: {
+				getGraph: jest.fn().mockResolvedValue({
+					tasks: [{ id: 'task-1', status: 'running' }],
+				}),
+				markSucceeded: jest.fn(),
+			},
+			workflowTaskService: {
+				reportBuildOutcome: jest.fn().mockResolvedValue({ type: 'continue_building' }),
+			},
+			...overrides,
+		} as unknown as NonNullable<InstanceAiContext['plannedBuildTask']>;
+	}
+
 	beforeEach(() => {
 		jest.clearAllMocks();
 		mockedParseAndValidate.mockReturnValue({
@@ -197,6 +218,127 @@ describe('workflow code create/update approval flow', () => {
 		expect(ctx.workflowService.createFromWorkflowJSON).not.toHaveBeenCalled();
 	});
 
+	it('reports planned build pre-save failures so the retry budget advances', async () => {
+		mockedParseAndValidate.mockImplementationOnce(() => {
+			throw new Error('Failed to parse workflow code: syntax error');
+		});
+		const reportBuildOutcome = jest
+			.fn<Promise<{ type: 'continue_building' }>, [WorkflowBuildOutcome]>()
+			.mockResolvedValue({ type: 'continue_building' });
+		const plannedBuildTask = makePlannedBuildTask({
+			workflowTaskService: {
+				reportBuildOutcome,
+			},
+		});
+		const ctx = makeContext(
+			{ createWorkflow: 'always_allow' },
+			{
+				runId: 'run-1',
+				plannedBuildTask,
+			},
+		);
+		const service = createWorkflowCodeService(ctx);
+		const { context } = makeToolContext();
+
+		const result = await service.create(
+			{ action: 'create', code: 'invalid', name: 'Lead intake' },
+			context,
+		);
+
+		expect(result).toEqual({
+			success: false,
+			errors: ['Failed to parse workflow code: syntax error'],
+		});
+		expect(reportBuildOutcome).toHaveBeenCalledTimes(1);
+		const outcome = reportBuildOutcome.mock.calls[0][0];
+		expect(outcome).toMatchObject({
+			workItemId: 'wi-1',
+			taskId: 'task-1',
+			runId: 'run-1',
+			submitted: false,
+			needsUserInput: false,
+		});
+		expect(outcome.failureSignature).toContain('parse_failed:');
+		expect(outcome.remediation).toMatchObject({
+			category: 'code_fixable',
+			shouldEdit: true,
+		});
+	});
+
+	it('surfaces the repair guard when the pre-save budget is exhausted', async () => {
+		mockedParseAndValidate.mockImplementationOnce(() => {
+			throw new Error('Failed to parse workflow code: syntax error');
+		});
+		const plannedBuildTask = makePlannedBuildTask({
+			workflowTaskService: {
+				reportBuildOutcome: jest.fn().mockResolvedValue({
+					type: 'blocked',
+					reason: 'The workflow could not be saved after three submit attempts.',
+				}),
+			},
+		});
+		const ctx = makeContext(
+			{ createWorkflow: 'always_allow' },
+			{
+				plannedBuildTask,
+			},
+		);
+		const service = createWorkflowCodeService(ctx);
+		const { context } = makeToolContext();
+
+		const result = await service.create(
+			{ action: 'create', code: 'invalid', name: 'Lead intake' },
+			context,
+		);
+
+		expect(result).toEqual({
+			success: false,
+			errors: [
+				'Failed to parse workflow code: syntax error',
+				'Repair guard stopped automatic edits: The workflow could not be saved after three submit attempts.',
+			],
+		});
+	});
+
+	it('adds expression-prefix guidance to validation errors', async () => {
+		mockedParseAndValidate.mockReturnValueOnce({
+			workflow: { ...validWorkflow },
+			warnings: [
+				{
+					code: 'MISSING_EXPRESSION_PREFIX',
+					nodeName: 'HTML',
+					message: 'Field "parameters.html": Must be an n8n expression (={{...}})',
+				},
+			],
+		});
+		const plannedBuildTask = makePlannedBuildTask();
+		const ctx = makeContext(
+			{ createWorkflow: 'always_allow' },
+			{
+				plannedBuildTask,
+			},
+		);
+		const service = createWorkflowCodeService(ctx);
+		const { context } = makeToolContext();
+
+		const result = await service.create(
+			{ action: 'create', code: validCode, name: 'Lead intake' },
+			context,
+		);
+
+		expect(result).toEqual({
+			success: false,
+			errors: [expect.stringContaining('Use expr')],
+			warnings: undefined,
+		});
+		expect(plannedBuildTask.workflowTaskService?.reportBuildOutcome).toHaveBeenCalledWith(
+			expect.objectContaining({
+				submitted: false,
+				failureSignature: 'validation_failed:MISSING_EXPRESSION_PREFIX:HTML',
+			}),
+		);
+	});
+
 	it('requires the workflow-builder skill when runtime skill tracking is active', async () => {
 		const ctx = makeContext(
 			{ createWorkflow: 'always_allow' },
@@ -277,6 +419,139 @@ describe('workflow code create/update approval flow', () => {
 			workflowId: 'created-wf',
 			triggerNodes: [{ nodeName: 'Webhook', nodeType: 'n8n-nodes-base.webhook' }],
 			hasUnresolvedPlaceholders: true,
+			verificationReadiness: { status: 'ready' },
+			setupRequirement: { status: 'required', reason: 'unresolved-placeholders' },
+		});
+	});
+
+	it('normalizes non-object node parameters before credential resolution and save', async () => {
+		mockedParseAndValidate.mockReturnValueOnce({
+			workflow: {
+				name: 'Lead intake',
+				nodes: [
+					{
+						id: 'manual',
+						name: 'Manual Trigger',
+						type: 'n8n-nodes-base.manualTrigger',
+						typeVersion: 1,
+						position: [0, 0],
+						parameters: null,
+					},
+					{
+						id: 'set',
+						name: 'Set',
+						type: 'n8n-nodes-base.set',
+						typeVersion: 3,
+						position: [100, 0],
+						parameters: [],
+					},
+				],
+				connections: {},
+			},
+			warnings: [],
+		} as ReturnType<typeof parseAndValidate>);
+		const ctx = makeContext({ createWorkflow: 'always_allow' });
+		const service = createWorkflowCodeService(ctx);
+		const { context } = makeToolContext();
+
+		await service.create({ action: 'create', code: validCode, name: 'Lead intake' }, context);
+
+		expect(ctx.workflowService.createFromWorkflowJSON).toHaveBeenCalledWith(
+			expect.objectContaining({
+				nodes: [
+					expect.objectContaining({ name: 'Manual Trigger', parameters: {} }),
+					expect.objectContaining({ name: 'Set', parameters: {} }),
+				],
+			}),
+			{},
+		);
+	});
+
+	it('treats Manual Trigger workflows as internally verifiable', async () => {
+		mockedParseAndValidate.mockReturnValueOnce({
+			workflow: {
+				name: 'Manual verification',
+				nodes: [
+					{
+						id: 'manual',
+						name: 'Manual Trigger',
+						type: 'n8n-nodes-base.manualTrigger',
+						typeVersion: 1,
+						position: [0, 0],
+						parameters: {},
+					},
+				],
+				connections: {},
+			},
+			warnings: [],
+		});
+		const ctx = makeContext({ createWorkflow: 'always_allow' });
+		const service = createWorkflowCodeService(ctx);
+		const { context } = makeToolContext();
+
+		const result = await service.create(
+			{ action: 'create', code: validCode, name: 'Manual verification' },
+			context,
+		);
+
+		expect(result).toMatchObject({
+			success: true,
+			workflowId: 'created-wf',
+			triggerNodes: [{ nodeName: 'Manual Trigger', nodeType: 'n8n-nodes-base.manualTrigger' }],
+			verificationReadiness: { status: 'ready' },
+			setupRequirement: { status: 'not_required' },
+		});
+	});
+
+	it('keeps mocked outbound credentials verifiable before setup when the trigger is mockable', async () => {
+		mockedParseAndValidate.mockReturnValueOnce({
+			workflow: {
+				name: 'Mocked Slack verification',
+				nodes: [
+					{
+						id: 'manual',
+						name: 'Manual Trigger',
+						type: 'n8n-nodes-base.manualTrigger',
+						typeVersion: 1,
+						position: [0, 0],
+						parameters: {},
+					},
+					{
+						id: 'slack',
+						name: 'Post Slack Message',
+						type: 'n8n-nodes-base.slack',
+						typeVersion: 2.5,
+						position: [100, 0],
+						parameters: {
+							resource: 'message',
+							operation: 'post',
+							channelId: '<__PLACEHOLDER_VALUE__Slack channel ID__>',
+							text: 'Hello from n8n',
+						},
+						credentials: {
+							slackApi: undefined as unknown as { id: string; name: string },
+						},
+					},
+				],
+				connections: {},
+			},
+			warnings: [],
+		});
+		const ctx = makeContext({ createWorkflow: 'always_allow' });
+		const service = createWorkflowCodeService(ctx);
+		const { context } = makeToolContext();
+
+		const result = await service.create(
+			{ action: 'create', code: validCode, name: 'Mocked Slack verification' },
+			context,
+		);
+
+		expect(result).toMatchObject({
+			success: true,
+			workflowId: 'created-wf',
+			triggerNodes: [{ nodeName: 'Manual Trigger', nodeType: 'n8n-nodes-base.manualTrigger' }],
+			mockedNodeNames: ['Post Slack Message'],
+			mockedCredentialTypes: ['slackApi'],
 			verificationReadiness: { status: 'ready' },
 			setupRequirement: { status: 'required', reason: 'unresolved-placeholders' },
 		});

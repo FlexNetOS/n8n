@@ -1,6 +1,7 @@
 import type { WorkflowJSON } from '@n8n/workflow-sdk';
 
 const KNOWN_MOCKABLE_TRIGGER_TYPES = new Set([
+	'n8n-nodes-base.manualTrigger',
 	'n8n-nodes-base.webhook',
 	'n8n-nodes-base.formTrigger',
 	'n8n-nodes-base.scheduleTrigger',

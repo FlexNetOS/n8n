@@ -158,7 +158,7 @@ describe('formatWorkflowLoopGuidance', () => {
 			};
 			const result = formatWorkflowLoopGuidance(action);
 			expect(result).toContain('verify-built-workflow');
-			expect(result).toContain('executions(action="run")');
+			expect(result).toContain('executions(action="run", requireApproval=false)');
 		});
 
 		it('should mention execution debug action and report-verification-verdict', () => {

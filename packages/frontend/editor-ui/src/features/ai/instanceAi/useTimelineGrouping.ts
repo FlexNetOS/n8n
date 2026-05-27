@@ -101,15 +101,8 @@ export function useTimelineGrouping(
 
 		for (const entry of timeline) {
 			if (entry.type === 'text') {
-				// Text from the same API response as the current group stays inside
-				// (intermediate "thinking" text). Otherwise it renders inline.
-				if (currentGroup && entry.responseId === currentGroup.responseId) {
-					currentGroup.entries.push(entry);
-					currentGroup.textCount++;
-				} else {
-					currentGroup = null;
-					segments.push({ kind: 'trailing-text', content: entry.content });
-				}
+				currentGroup = null;
+				segments.push({ kind: 'trailing-text', content: entry.content });
 			} else if (entry.type === 'tool-call') {
 				if (!currentGroup || currentGroup.responseId !== entry.responseId) {
 					currentGroup = newGroup(entry.responseId);
@@ -136,19 +129,6 @@ export function useTimelineGrouping(
 				if (child) {
 					appendArtifacts(currentGroup, extractArtifacts(child));
 				}
-			}
-		}
-
-		// Extract trailing text from each response group — the last text entry
-		// is usually the conclusion after tool calls and should be visible.
-		for (let i = segments.length - 1; i >= 0; i--) {
-			const seg = segments[i];
-			if (seg.kind !== 'response-group') continue;
-			const last = seg.entries.at(-1);
-			if (last?.type === 'text') {
-				seg.entries.pop();
-				seg.textCount--;
-				segments.splice(i + 1, 0, { kind: 'trailing-text', content: last.content });
 			}
 		}
 

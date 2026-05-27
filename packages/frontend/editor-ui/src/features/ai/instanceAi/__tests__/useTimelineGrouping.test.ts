@@ -87,4 +87,34 @@ describe('useTimelineGrouping', () => {
 			}),
 		);
 	});
+
+	test('renders intermediate text between tool calls as visible timeline text', () => {
+		const agentNode = makeAgentNode({
+			toolCalls: [
+				makeToolCall({ toolCallId: 'tc-build', toolName: 'workflows' }),
+				makeToolCall({ toolCallId: 'tc-verify', toolName: 'verify-built-workflow' }),
+			],
+			timeline: [
+				{ type: 'tool-call', toolCallId: 'tc-build', responseId: 'response-1' },
+				{ type: 'text', content: 'Built the draft. Testing it now.', responseId: 'response-1' },
+				{ type: 'tool-call', toolCallId: 'tc-verify', responseId: 'response-1' },
+				{ type: 'text', content: 'Verification passed with mocks.', responseId: 'response-1' },
+			],
+		});
+
+		const segments = useTimelineGrouping(ref(agentNode)).value;
+
+		expect(segments).toEqual([
+			expect.objectContaining({
+				kind: 'response-group',
+				entries: [{ type: 'tool-call', toolCallId: 'tc-build', responseId: 'response-1' }],
+			}),
+			{ kind: 'trailing-text', content: 'Built the draft. Testing it now.' },
+			expect.objectContaining({
+				kind: 'response-group',
+				entries: [{ type: 'tool-call', toolCallId: 'tc-verify', responseId: 'response-1' }],
+			}),
+			{ kind: 'trailing-text', content: 'Verification passed with mocks.' },
+		]);
+	});
 });

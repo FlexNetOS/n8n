@@ -642,7 +642,8 @@ export interface InstanceAiContext {
 	permissions?: InstanceAiPermissions;
 	/** When set, `runWorkflow: 'always_allow'` only short-circuits HITL approval for these workflow IDs.
 	 *  Used by checkpoint follow-up runs to scope the override to the workflows the checkpoint is
-	 *  verifying — `executions(action="run")` on any other workflow still requires user approval. */
+	 *  verifying. Scoped runs must also pass `requireApproval: false`; omitted or true approval intent,
+	 *  or any other workflow ID, still requires user approval. */
 	allowedRunWorkflowIds?: ReadonlySet<string>;
 	/** When set, `updateWorkflow: 'always_allow'` only short-circuits HITL approval for these workflow IDs.
 	 *  Used by checkpoint follow-up runs so verification repairs can update approved workflow outputs

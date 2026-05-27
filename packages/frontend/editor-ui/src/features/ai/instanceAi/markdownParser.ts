@@ -119,8 +119,9 @@ function splitPotentialCommandPrefix(text: string): {
 	hiddenPrefix: string;
 } {
 	const commandTags = ['<command:artifact-create>', '<command:artifact-edit>'];
+	const maxTagLength = Math.max(...commandTags.map((tag) => tag.length));
 
-	for (let len = 1; len <= Math.min(text.length, 30); len++) {
+	for (let len = Math.min(text.length, maxTagLength); len >= 1; len--) {
 		const suffix = text.slice(-len);
 
 		for (const tag of commandTags) {

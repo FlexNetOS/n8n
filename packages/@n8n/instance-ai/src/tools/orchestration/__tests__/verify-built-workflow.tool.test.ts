@@ -151,6 +151,41 @@ describe('verify-built-workflow tool — remediation guard', () => {
 		expect(context.workflowTaskService!.reportVerificationVerdict).not.toHaveBeenCalled();
 	});
 
+	it('routes generic workflow issue gates to setup when the build has unresolved setup context', async () => {
+		const context = createContext();
+		jest.mocked(context.workflowTaskService!.getBuildOutcome).mockResolvedValue({
+			workItemId: 'wi_1',
+			taskId: 'task_1',
+			workflowId: 'wf_1',
+			submitted: true,
+			triggerType: 'manual_or_testable',
+			needsUserInput: true,
+			hasUnresolvedPlaceholders: true,
+			mockedCredentialTypes: ['slackApi'],
+			mockedNodeNames: ['Slack'],
+			summary: 'Built',
+		});
+		jest
+			.mocked(context.domainContext!.executionService.run)
+			.mockRejectedValue(
+				new Error(
+					'The workflow has issues and cannot be executed for that reason. Please fix them first.',
+				),
+			);
+		const tool = createVerifyBuiltWorkflowTool(context);
+
+		const result = await executeTool(tool, { workItemId: 'wi_1', workflowId: 'wf_1' });
+
+		expect(result.remediation).toMatchObject({
+			category: 'needs_setup',
+			shouldEdit: false,
+			reason: 'mocked_credentials_or_placeholders',
+		});
+		expect(context.workflowTaskService!.reportVerificationVerdict).toHaveBeenCalledWith(
+			expect.objectContaining({ verdict: 'needs_user_input' }),
+		);
+	});
+
 	it('does not treat unresolved placeholders as setup when the execution error is code-fixable', async () => {
 		const context = createContext();
 		jest.mocked(context.workflowTaskService!.getBuildOutcome).mockResolvedValue({

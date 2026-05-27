@@ -17,8 +17,10 @@ import type { InstanceAiContext } from '../../types';
 import { parseAndValidate, partitionWarnings } from '../../workflow-builder';
 import { extractWorkflowCode } from '../../workflow-builder/extract-code';
 import { applyPatches } from '../../workflow-builder/patch-code';
+import { createRemediation } from '../../workflow-loop/remediation';
 import type {
 	WorkflowBuildOutcome,
+	WorkflowLoopAction,
 	WorkflowSetupRequirement,
 	WorkflowVerificationReadiness,
 } from '../../workflow-loop/workflow-loop-state';
@@ -371,23 +373,27 @@ function determineDirectVerificationReadiness(
 		};
 	}
 
-	if (hasMockedCredentials(outcome) && !hasCredentialVerificationData(outcome)) {
+	if (
+		hasCredentialVerificationData(outcome) ||
+		outcome.triggerNodes?.some((node) => isMockableTriggerNodeType(node.nodeType))
+	) {
+		return { status: 'ready' };
+	}
+
+	if (hasMockedCredentials(outcome)) {
 		return {
 			status: 'needs_setup',
 			reason: 'missing-mocked-credential-pin-data',
-			guidance: 'Route the workflow through setup because mocked credentials cannot be verified.',
+			guidance:
+				'The workflow has mocked credentials but no mockable trigger or verification pin data, so it cannot be verified before setup.',
 		};
 	}
 
-	if (!outcome.triggerNodes?.some((node) => isMockableTriggerNodeType(node.nodeType))) {
-		return {
-			status: 'not_verifiable',
-			reason: 'non-mockable-trigger',
-			guidance: 'The workflow does not have a trigger the post-build verifier can exercise.',
-		};
-	}
-
-	return { status: 'ready' };
+	return {
+		status: 'not_verifiable',
+		reason: 'non-mockable-trigger',
+		guidance: 'The workflow does not have a trigger the post-build verifier can exercise.',
+	};
 }
 
 function determineDirectSetupRequirement(
@@ -429,6 +435,62 @@ function hasArrayItems(value: string[] | undefined): value is string[] {
 
 function hasRecordEntries<T>(value: Record<string, T> | undefined): value is Record<string, T> {
 	return Object.keys(value ?? {}).length > 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeWorkflowNodeParameters(json: WorkflowJSON): void {
+	for (const node of json.nodes ?? []) {
+		if (!isRecord(node.parameters)) {
+			node.parameters = {};
+		}
+	}
+}
+
+function enhanceValidationErrors(errors: string[]): string[] {
+	return errors.map((error) => {
+		if (error.includes('[MISSING_EXPRESSION_PREFIX]')) {
+			return (
+				`${error}\n` +
+				'Hint: n8n expressions in node parameters must start with ={{ ... }}. ' +
+				"Use expr('{{ ... }}') in workflow SDK code so the saved parameter becomes ={{ ... }}."
+			);
+		}
+
+		return error;
+	});
+}
+
+function enhanceBuildErrors(errors: string[]): string[] {
+	const templateExpressionPrefix = '$' + '{';
+
+	return errors.map((error) => {
+		const lower = error.toLowerCase();
+		const looksLikeTemplateLiteralIssue =
+			lower.includes('unterminated template') ||
+			lower.includes('template literal') ||
+			(lower.includes('unexpected token') && error.includes(templateExpressionPrefix));
+
+		if (looksLikeTemplateLiteralIssue) {
+			return (
+				`${error}\n` +
+				'Hint: check Code node snippets and JavaScript template literals. Escape backticks ' +
+				`and ${templateExpressionPrefix}...} sequences that should be saved as literal code, or use a quoted string.`
+			);
+		}
+
+		return error;
+	});
+}
+
+function appendWorkflowLoopAction(
+	errors: string[],
+	action: WorkflowLoopAction | undefined,
+): string[] {
+	if (action?.type !== 'blocked') return errors;
+	return [...errors, `Repair guard stopped automatic edits: ${action.reason}`];
 }
 
 function buildWorkflowOutcomeBase({
@@ -572,6 +634,66 @@ async function reportPlannedBuildSuccess({
 	);
 }
 
+async function reportPlannedBuildFailure({
+	context,
+	errors,
+	failureSignature,
+}: {
+	context: InstanceAiContext;
+	errors: string[];
+	failureSignature: string;
+}): Promise<WorkflowLoopAction | undefined> {
+	const plannedBuildTask = context.plannedBuildTask;
+	if (!plannedBuildTask) return;
+	const graph = await plannedBuildTask.plannedTaskService.getGraph(plannedBuildTask.threadId);
+	const task = graph?.tasks.find((t) => t.id === plannedBuildTask.taskId);
+	if (task?.status !== 'running') {
+		context.logger?.warn?.('Skipped planned build failure report because task is not running', {
+			threadId: plannedBuildTask.threadId,
+			taskId: plannedBuildTask.taskId,
+			status: task?.status ?? 'not-found',
+		});
+		return;
+	}
+
+	const summary = `Workflow build failed before save: ${errors[0] ?? failureSignature}`;
+	const guidance =
+		errors.length > 0
+			? errors.join('\n')
+			: 'Fix the workflow SDK code and call workflows(action="create"|"update") again.';
+	const outcome: WorkflowBuildOutcome = {
+		workItemId: plannedBuildTask.workItemId,
+		...(context.runId ? { runId: context.runId } : {}),
+		taskId: plannedBuildTask.taskId,
+		submitted: false,
+		triggerType: 'manual_or_testable',
+		needsUserInput: false,
+		failureSignature,
+		remediation: createRemediation({
+			category: 'code_fixable',
+			shouldEdit: true,
+			reason: failureSignature,
+			guidance,
+		}),
+		summary,
+	};
+
+	return await plannedBuildTask.workflowTaskService?.reportBuildOutcome(outcome);
+}
+
+async function reportPlannedBuildFailureSafely(
+	input: Parameters<typeof reportPlannedBuildFailure>[0],
+): Promise<WorkflowLoopAction | undefined> {
+	try {
+		return await reportPlannedBuildFailure(input);
+	} catch (error) {
+		input.context.logger?.warn?.('Failed to report planned build failure', {
+			error: error instanceof Error ? error.message : String(error),
+		});
+		return undefined;
+	}
+}
+
 async function reportPlannedBuildSuccessSafely(
 	input: Parameters<typeof reportPlannedBuildSuccess>[0],
 ): Promise<string | undefined> {
@@ -697,12 +819,24 @@ export function createWorkflowCodeService(context: InstanceAiContext) {
 			try {
 				baseCode = await getPatchBaseCode(workflowId);
 			} catch {
+				await reportPlannedBuildFailureSafely({
+					context,
+					errors: ['Patch mode: could not fetch workflow. Send full code instead.'],
+					failureSignature: 'patch_fetch_failed',
+				});
 				return {
 					success: false,
 					errors: ['Patch mode: could not fetch workflow. Send full code instead.'],
 				};
 			}
 			if (!baseCode) {
+				await reportPlannedBuildFailureSafely({
+					context,
+					errors: [
+						'Patch mode requires either previous workflow code in this turn or a workflowId to fetch from.',
+					],
+					failureSignature: 'patch_base_missing',
+				});
 				return {
 					success: false,
 					errors: [
@@ -713,6 +847,11 @@ export function createWorkflowCodeService(context: InstanceAiContext) {
 
 			const patchResult = applyPatches(baseCode, patches);
 			if (!patchResult.success) {
+				await reportPlannedBuildFailureSafely({
+					context,
+					errors: [patchResult.error],
+					failureSignature: `patch_apply_failed:${patchResult.error}`,
+				});
 				return { success: false, errors: [patchResult.error] };
 			}
 
@@ -720,6 +859,11 @@ export function createWorkflowCodeService(context: InstanceAiContext) {
 		} else if (code) {
 			finalCode = extractWorkflowCode(code);
 		} else {
+			await reportPlannedBuildFailureSafely({
+				context,
+				errors: ['Either `code` (full code) or `patches` (to fix previous code) is required.'],
+				failureSignature: 'missing_code_or_patches',
+			});
 			return {
 				success: false,
 				errors: ['Either `code` (full code) or `patches` (to fix previous code) is required.'],
@@ -734,9 +878,17 @@ export function createWorkflowCodeService(context: InstanceAiContext) {
 			});
 		} catch (error) {
 			rememberRejectedCode(workflowId, finalCode);
+			const errors = enhanceBuildErrors([
+				error instanceof Error ? error.message : 'Failed to parse workflow code',
+			]);
+			const loopAction = await reportPlannedBuildFailureSafely({
+				context,
+				errors,
+				failureSignature: `parse_failed:${errors[0] ?? 'unknown'}`,
+			});
 			return {
 				success: false,
-				errors: [error instanceof Error ? error.message : 'Failed to parse workflow code'],
+				errors: appendWorkflowLoopAction(errors, loopAction),
 			};
 		}
 
@@ -745,11 +897,19 @@ export function createWorkflowCodeService(context: InstanceAiContext) {
 
 		if (errors.length > 0) {
 			rememberRejectedCode(workflowId, finalCode);
+			const formattedErrors = enhanceValidationErrors(
+				errors.map((e) => `[${e.code}]${e.nodeName ? ` (${e.nodeName})` : ''}: ${e.message}`),
+			);
+			const loopAction = await reportPlannedBuildFailureSafely({
+				context,
+				errors: formattedErrors,
+				failureSignature: `validation_failed:${errors
+					.map((e) => `${e.code}${e.nodeName ? `:${e.nodeName}` : ''}`)
+					.join('|')}`,
+			});
 			return {
 				success: false,
-				errors: errors.map(
-					(e) => `[${e.code}]${e.nodeName ? ` (${e.nodeName})` : ''}: ${e.message}`,
-				),
+				errors: appendWorkflowLoopAction(formattedErrors, loopAction),
 				warnings:
 					informational.length > 0
 						? informational.map((w) => `[${w.code}]: ${w.message}`)
@@ -758,9 +918,17 @@ export function createWorkflowCodeService(context: InstanceAiContext) {
 		}
 
 		const json = result.workflow;
+		normalizeWorkflowNodeParameters(json);
 		if (name) {
 			json.name = name;
 		} else if (!json.name && !workflowId) {
+			await reportPlannedBuildFailureSafely({
+				context,
+				errors: [
+					'Workflow name is required for new workflows. Provide a name parameter or set it in the SDK code.',
+				],
+				failureSignature: 'missing_workflow_name',
+			});
 			return {
 				success: false,
 				errors: [
@@ -876,11 +1044,15 @@ export function createWorkflowCodeService(context: InstanceAiContext) {
 				};
 			}
 		} catch (error) {
+			const message = `Workflow save failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+			const loopAction = await reportPlannedBuildFailureSafely({
+				context,
+				errors: [message],
+				failureSignature: `save_failed:${message}`,
+			});
 			return {
 				success: false,
-				errors: [
-					`Workflow save failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				],
+				errors: appendWorkflowLoopAction([message], loopAction),
 			};
 		}
 	}

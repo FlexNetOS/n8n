@@ -288,7 +288,7 @@ export class TypeORMAgentMemory
 		return {
 			messages: entities.reverse().flatMap((entity) => {
 				const message = this.toAgentMessage(entity);
-				return message ? [message] : [];
+				return message && !isPendingUserInputMessage(message) ? [message] : [];
 			}),
 		};
 	}

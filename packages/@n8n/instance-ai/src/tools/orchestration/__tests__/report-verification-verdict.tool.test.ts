@@ -100,7 +100,9 @@ describe('report-verification-verdict tool', () => {
 		const result = await executeTool(tool, baseInput, {} as never);
 
 		expect((result as { guidance: string }).guidance).toContain('VERIFY');
-		expect((result as { guidance: string }).guidance).toContain('executions(action="run")');
+		expect((result as { guidance: string }).guidance).toContain(
+			'executions(action="run", requireApproval=false)',
+		);
 	});
 
 	it('returns patch guidance when needs_patch produces patch action', async () => {

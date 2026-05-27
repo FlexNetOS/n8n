@@ -60,7 +60,7 @@ const runAction = z.object({
 		.boolean()
 		.optional()
 		.describe(
-			'Set true when the user explicitly asked to run/execute the workflow, even inside a checkpoint follow-up. Leave unset for internal verification runs.',
+			'Set true when the user explicitly asked to run/execute the workflow, even inside a checkpoint follow-up. Set false only for internal verification runs scoped by the checkpoint.',
 		),
 });
 
@@ -152,7 +152,8 @@ async function handleRun(
 	const allowList = context.allowedRunWorkflowIds;
 	const allowedByScope =
 		context.permissions?.runWorkflow === 'always_allow' &&
-		(allowList === undefined || allowList.has(input.workflowId));
+		(allowList === undefined ||
+			(allowList.has(input.workflowId) && input.requireApproval === false));
 	const needsApproval = input.requireApproval === true || !allowedByScope;
 
 	// If approval is required and this is the first call, suspend for confirmation

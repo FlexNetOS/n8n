@@ -24,9 +24,11 @@ Use the saved build outcome as the routing source:
 - If `outcome.verificationReadiness.status === "ready"`, verify with
   `verify-built-workflow` using `outcome.workItemId`, `outcome.workflowId`, and
   trigger-appropriate `inputData`. If `verify-built-workflow` is not available
-  in this host, use `executions(action="run")` when the workflow has real
-  credentials and a testable trigger; otherwise explain the blocker.
-- If `outcome.verificationReadiness.status === "needs_setup"`, call
+  in this host, use `executions(action="run", requireApproval=false)` when the
+  workflow has real credentials and a testable trigger; otherwise explain the
+  blocker.
+- If `outcome.verificationReadiness.status === "needs_setup"`, verification
+  could not run with the available mocks or pin data. Call
   `workflows(action="setup")` so the user can configure the workflow through the
   inline setup card in the AI Assistant panel. If setup returns
   `deferred: true`, verification has not run; complete the checkpoint as failed
@@ -40,8 +42,8 @@ Internal verification is not a substitute for an explicit user request to run or
 execute the workflow. If the original request asked to run/execute after
 building, finish lifecycle verification first, then call
 `executions(action="run", requireApproval=true)` for the saved workflow so normal
-run approval applies. Do not set `requireApproval=true` for internal lifecycle
-verification.
+run approval applies. Set `requireApproval=false` only for internal lifecycle
+verification runs.
 
 ## Per-Trigger inputData Shape
 
@@ -54,6 +56,8 @@ shape creates null downstream values that look like expression bugs:
   `{event: "signup", userId: "..."}`. The adapter wraps it under `body`.
 - Chat Trigger (`@n8n/n8n-nodes-langchain.chatTrigger`): pass
   `{chatInput: "user message"}`.
+- Manual Trigger (`n8n-nodes-base.manualTrigger`): pass a flat field map or
+  omit `inputData`.
 - Schedule Trigger (`n8n-nodes-base.scheduleTrigger`): omit `inputData`; the
   adapter emits synthetic timestamp fields.
 

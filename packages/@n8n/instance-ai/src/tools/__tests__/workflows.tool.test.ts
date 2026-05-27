@@ -932,6 +932,31 @@ describe('workflows tool', () => {
 	});
 
 	describe('setup action', () => {
+		it('should block setup during planned build follow-up turns', async () => {
+			const context = createMockContext({
+				plannedBuildTask: {
+					taskId: 'task-1',
+					title: 'Build workflow',
+					threadId: 'thread-1',
+					workItemId: 'wi_1',
+				} as unknown as NonNullable<InstanceAiContext['plannedBuildTask']>,
+			});
+
+			const tool = createWorkflowsTool(context, 'full');
+			const result = await executeTool(tool, { action: 'setup', workflowId: 'wf1' }, {
+				resumeData: undefined,
+			} as never);
+
+			expect(result).toEqual({
+				success: false,
+				denied: true,
+				reason:
+					'Setup is handled by the verification checkpoint after the planned build is saved. Stop after workflows(action="create"|"update") in the build follow-up.',
+			});
+			expect(analyzeWorkflow).not.toHaveBeenCalled();
+			expect(applyNodeChanges).not.toHaveBeenCalled();
+		});
+
 		it('should block setup when updateWorkflow permission is blocked', async () => {
 			const context = createMockContext({
 				permissions: { updateWorkflow: 'blocked' },

@@ -167,6 +167,7 @@ import {
 } from '@n8n/instance-ai';
 
 import { InstanceAiService } from '../instance-ai.service';
+import { TraceReplayState } from '../trace-replay-state';
 
 type ServiceInternals = {
 	pendingCheckpointReentries: Map<string, Set<string>>;
@@ -675,12 +676,14 @@ type TerminalGuardOrderServiceInternals = {
 		events: InstanceAiEvent[];
 		getEventsForRun: jest.Mock;
 		getEventsForRuns: jest.Mock;
+		getEventsAfter: jest.Mock;
 		publish: jest.Mock;
 	};
 	liveness: { consumeRunTimeout: jest.Mock };
 	telemetry: { track: jest.Mock };
 	logger: { warn: jest.Mock; error: jest.Mock };
 	traceContextsByRunId: Map<string, { threadId: string; messageGroupId?: string }>;
+	pendingUserInputMessageIdsByRunId: Map<string, string>;
 	threadPushRef: Map<string, string>;
 	finalizeRunTracing: jest.Mock;
 	saveAgentTreeSnapshot: jest.Mock;
@@ -738,6 +741,16 @@ type SnapshotServiceInternals = {
 	logger: { warn: jest.Mock };
 };
 
+type TraceEventServiceInternals = {
+	traceReplay: TraceReplayState;
+	eventBus: { getEventsAfter: jest.Mock };
+	traceContextsByRunId: Map<
+		string,
+		{ traceSlug?: string; tracing: { traceWriter?: { getEvents: jest.Mock } } }
+	>;
+	getTraceEvents: (slug: string) => unknown[];
+};
+
 function createTerminalGuardOrderService(): TerminalGuardOrderServiceInternals {
 	const events: InstanceAiEvent[] = [];
 	const service = Object.create(
@@ -754,6 +767,7 @@ function createTerminalGuardOrderService(): TerminalGuardOrderServiceInternals {
 		events,
 		getEventsForRun: jest.fn(() => events),
 		getEventsForRuns: jest.fn(() => events),
+		getEventsAfter: jest.fn(() => events.map((event, index) => ({ id: index + 1, event }))),
 		publish: jest.fn((_threadId: string, event: InstanceAiEvent) => {
 			events.push(event);
 		}),
@@ -764,6 +778,7 @@ function createTerminalGuardOrderService(): TerminalGuardOrderServiceInternals {
 	service.traceContextsByRunId = new Map([
 		['run-1', { threadId: 'thread-a', messageGroupId: 'group-1' }],
 	]);
+	service.pendingUserInputMessageIdsByRunId = new Map();
 	service.threadPushRef = new Map();
 	service.finalizeRunTracing = jest.fn(async () => {});
 	service.saveAgentTreeSnapshot = jest.fn(async () => {});
@@ -773,6 +788,41 @@ function createTerminalGuardOrderService(): TerminalGuardOrderServiceInternals {
 	service.schedulePlannedTasks = jest.fn(async () => {});
 	service.finalizePlannedBuildFollowUp = jest.fn(async () => {});
 	service.drainPendingCheckpointReentries = jest.fn(async () => {});
+	return service;
+}
+
+function makeToolEvent(
+	type: 'tool-call' | 'tool-result' | 'confirmation-request',
+	runId: string,
+	toolCallId: string,
+	payload: Record<string, unknown>,
+): InstanceAiEvent {
+	return {
+		type,
+		runId,
+		agentId: 'agent-001',
+		payload,
+	} as InstanceAiEvent;
+}
+
+function createTraceEventService(events: InstanceAiEvent[]): TraceEventServiceInternals {
+	const service = Object.create(InstanceAiService.prototype) as TraceEventServiceInternals;
+	service.traceReplay = new TraceReplayState();
+	service.traceReplay.registerRun('slug', 'thread-a', 'run-setup');
+	service.traceReplay.registerRun('slug', 'thread-a', 'run-build');
+	service.traceReplay.registerRun('slug', 'thread-a', 'run-verify');
+	service.eventBus = {
+		getEventsAfter: jest.fn(() => events.map((event, index) => ({ id: index + 1, event }))),
+	};
+	service.traceContextsByRunId = new Map([
+		[
+			'run-build',
+			{
+				traceSlug: 'slug',
+				tracing: { traceWriter: { getEvents: jest.fn(() => [{ kind: 'header' }]) } },
+			},
+		],
+	]);
 	return service;
 }
 
@@ -1959,6 +2009,69 @@ describe('InstanceAiService — terminal outcome replay', () => {
 
 		expect(service.createTerminalOutcomeStorage).toHaveBeenCalledTimes(2);
 		expect(storage.getUndelivered).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe('InstanceAiService — trace events', () => {
+	it('uses chronological event-bus events across registered runs', () => {
+		const events = [
+			makeToolEvent('tool-call', 'run-build', 'create-call', {
+				toolName: 'workflows',
+				toolCallId: 'create-call',
+				args: { action: 'create' },
+			}),
+			makeToolEvent('tool-result', 'run-build', 'create-call', {
+				toolCallId: 'create-call',
+				result: { success: true, workflowId: 'wf-1' },
+			}),
+			makeToolEvent('tool-call', 'run-verify', 'verify-call', {
+				toolName: 'verify-built-workflow',
+				toolCallId: 'verify-call',
+				args: { workflowId: 'wf-1' },
+			}),
+			makeToolEvent('tool-result', 'run-verify', 'verify-call', {
+				toolCallId: 'verify-call',
+				result: {
+					success: false,
+					remediation: { category: 'needs_setup', reason: 'mocked_credentials_or_placeholders' },
+				},
+			}),
+			makeToolEvent('confirmation-request', 'run-setup', 'setup-call', {
+				toolName: 'workflows',
+				toolCallId: 'setup-call',
+				args: { action: 'setup', workflowId: 'wf-1' },
+			}),
+		];
+		const service = createTraceEventService(events);
+
+		expect(service.getTraceEvents('slug')).toEqual([
+			expect.objectContaining({
+				kind: 'tool-call',
+				toolName: 'workflows',
+				output: { success: true, workflowId: 'wf-1' },
+			}),
+			expect.objectContaining({
+				kind: 'tool-call',
+				toolName: 'verify-built-workflow',
+				output: expect.objectContaining({
+					remediation: expect.objectContaining({
+						category: 'needs_setup',
+						reason: 'mocked_credentials_or_placeholders',
+					}),
+				}),
+			}),
+			expect.objectContaining({
+				kind: 'tool-suspend',
+				toolName: 'workflows',
+				input: { action: 'setup', workflowId: 'wf-1' },
+			}),
+		]);
+	});
+
+	it('falls back to writer traces only when no event-bus tool events exist', () => {
+		const service = createTraceEventService([]);
+
+		expect(service.getTraceEvents('slug')).toEqual([{ kind: 'header' }]);
 	});
 });
 

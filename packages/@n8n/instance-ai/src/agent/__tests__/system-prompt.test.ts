@@ -291,6 +291,7 @@ describe('getSystemPrompt', () => {
 			);
 			expect(prompt).toContain('executions(action="run", requireApproval=true)');
 			expect(prompt).toContain('so normal run approval applies');
+			expect(prompt).toContain('requireApproval=false');
 		});
 
 		it('tells the orchestrator it may patch directly during a checkpoint', () => {
