@@ -29,6 +29,7 @@ export type McpRegistryServer = {
 	isOfficial: boolean;
 	origin: 'registry';
 	status: McpRegistryServerStatus;
+	// FIXME: api returns {data?: string[]} not string[]
 	tags?: string[];
 };
 
