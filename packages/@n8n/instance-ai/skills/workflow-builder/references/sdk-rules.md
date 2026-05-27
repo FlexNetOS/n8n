@@ -84,6 +84,9 @@ Switch uses `.onCase(index, target)`, Merge inputs use `.input(0)`,
 - Use `newCredential('Suggested Name')` when no exact credential is selected;
   `workflows(action="create"|"update")` preserves valid credentials and mocks
   unresolved ones.
+- Always wrap credentials in the credential property names from the node type
+  definition, for example `credentials: { slackApi: newCredential('Slack') }`.
+  Do not set `credentials` directly to `newCredential(...)`.
 - When editing round-tripped workflow code, remove `position` arrays and replace
   raw credential objects with `newCredential(...)`.
 - The credential-selection guidance above applies to outbound service calls. For

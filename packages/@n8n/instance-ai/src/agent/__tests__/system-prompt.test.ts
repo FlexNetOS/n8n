@@ -8,7 +8,9 @@ describe('getSystemPrompt', () => {
 			expect(prompt).toContain('before your first tool call');
 			expect(prompt).toContain('write one short sentence');
 			expect(prompt).toContain("Keep it tied to the user's goal, not the tool name");
-			expect(prompt).toContain('add a brief progress sentence between meaningful phases');
+			expect(prompt).toContain('narrate between tools whenever a tool result changes');
+			expect(prompt).toContain('do not run through multiple phases silently');
+			expect(prompt).toContain('applies to normal turns and system-generated follow-up turns');
 			expect(prompt).toContain('Never let an empty assistant message');
 			expect(prompt).toContain('[Calling tools: ...]');
 		});
@@ -198,6 +200,9 @@ describe('getSystemPrompt', () => {
 
 			expect(prompt).toContain('inline setup card in the AI Assistant panel');
 			expect(prompt).toContain('Never describe workflow setup as something the user starts');
+			expect(prompt).toContain(
+				'do not tell the user to open the workflow editor to configure setup',
+			);
 			expect(prompt).not.toMatch(/setup wizard/i);
 		});
 
@@ -228,6 +233,17 @@ describe('getSystemPrompt', () => {
 			expect(prompt).toContain('with that exact workflow ID');
 		});
 
+		it('allows phase progress in planned follow-ups without final completion text', () => {
+			const prompt = getSystemPrompt({});
+
+			expect(prompt).toContain('Write short progress notes before meaningful phases');
+			expect(prompt).toContain(
+				'including build-workflow, checkpoint, setup, verification, and repair loops',
+			);
+			expect(prompt).toContain('do not write a final completion message');
+			expect(prompt).toContain('checkpoint card is the reporting boundary');
+		});
+
 		it('reuses deterministic already-verified readiness instead of re-running verify', () => {
 			const prompt = getSystemPrompt({});
 
@@ -254,13 +270,15 @@ describe('getSystemPrompt', () => {
 			expect(prompt).not.toContain('Always run your own verification');
 		});
 
-		it('routes verified checkpoint workflows with setup needs through workflow setup before completion', () => {
+		it('does not mark setup-deferred checkpoint workflows as verified', () => {
 			const prompt = getSystemPrompt({});
 
 			expect(prompt).toContain('workflows(action="setup")');
 			expect(prompt).toContain('outcome.setupRequirement');
 			expect(prompt).toContain('build lifecycle reference');
-			expect(prompt).not.toContain('deferred: true');
+			expect(prompt).toContain('If setup is required before verification');
+			expect(prompt).toContain('verification has not run');
+			expect(prompt).toContain('setupDeferred: true');
 		});
 
 		it('tells the orchestrator it may patch directly during a checkpoint', () => {

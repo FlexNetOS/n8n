@@ -19,6 +19,8 @@ export interface ResourceEntry {
 	 * "Archived" label.
 	 */
 	archived?: boolean;
+	/** True when this workflow exists but should be configured in the setup card before previewing. */
+	needsSetup?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,6 +56,7 @@ function recordProduced(col: Collections, entry: ResourceEntry): void {
 				createdAt: entry.createdAt ?? existing.createdAt,
 				updatedAt: entry.updatedAt ?? existing.updatedAt,
 				projectId: entry.projectId ?? existing.projectId,
+				needsSetup: entry.needsSetup ?? existing.needsSetup,
 			}
 		: entry;
 	col.produced.set(entry.id, merged);
@@ -120,7 +123,26 @@ function extractFromToolCall(tc: InstanceAiToolCallState, col: Collections): voi
 			optionalString(tc.args?.name) ??
 			existing?.name ??
 			'Untitled';
-		recordProduced(col, { type: 'workflow', id: result.workflowId, name });
+		recordProduced(col, {
+			type: 'workflow',
+			id: result.workflowId,
+			name,
+			needsSetup: workflowResultNeedsSetup(result),
+		});
+	}
+
+	if (
+		tc.toolName === 'workflows' &&
+		action === 'setup' &&
+		typeof tc.args?.workflowId === 'string'
+	) {
+		const existing = col.produced.get(tc.args.workflowId);
+		if (existing) {
+			recordProduced(col, {
+				...existing,
+				needsSetup: result.success === true ? result.deferred === true : existing.needsSetup,
+			});
+		}
 	}
 
 	// Single workflow object: { workflow: { id, name, ... } } — produced.
@@ -198,6 +220,25 @@ function extractFromToolCall(tc: InstanceAiToolCallState, col: Collections): voi
 			projectId: result.projectId,
 		});
 	}
+}
+
+function workflowResultNeedsSetup(result: Record<string, unknown>): boolean {
+	const setupRequirement = result.setupRequirement;
+	if (setupRequirement && typeof setupRequirement === 'object') {
+		const status = (setupRequirement as Record<string, unknown>).status;
+		if (status === 'required') return true;
+	}
+
+	const verificationReadiness = result.verificationReadiness;
+	if (verificationReadiness && typeof verificationReadiness === 'object') {
+		const status = (verificationReadiness as Record<string, unknown>).status;
+		if (status === 'needs_setup') return true;
+	}
+
+	return (
+		(Array.isArray(result.mockedNodeNames) && result.mockedNodeNames.length > 0) ||
+		(Array.isArray(result.mockedCredentialTypes) && result.mockedCredentialTypes.length > 0)
+	);
 }
 
 /**

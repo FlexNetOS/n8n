@@ -815,13 +815,36 @@ function handleWorkflowFailures(report: WorkflowFailuresReport) {
 							@toggle-expanded="togglePreviewExpanded"
 						/>
 						<!-- Hoisted above the tab v-for so the iframe survives tab switches; tabs swap
-     workflows via openWorkflow postMessage instead of remounting. -->
+	     workflows via openWorkflow postMessage instead of remounting. -->
 						<div :class="$style.previewContent">
+							<div
+								v-if="preview.activeSetupWorkflowId.value"
+								:class="$style.setupRequiredState"
+								data-test-id="instance-ai-workflow-setup-required-preview"
+							>
+								<N8nText size="medium" bold>
+									{{ i18n.baseText('instanceAi.workflowPreview.setupRequired.title') }}
+								</N8nText>
+								<N8nText size="small" color="text-light" align="center">
+									{{
+										i18n.baseText('instanceAi.workflowPreview.setupRequired.description', {
+											interpolate: {
+												name:
+													preview.activeSetupWorkflowName.value ??
+													i18n.baseText('instanceAi.workflowPreview.setupRequired.workflow'),
+											},
+										})
+									}}
+								</N8nText>
+							</div>
 							<InstanceAiWorkflowPreview
 								ref="workflowPreview"
 								:class="[
 									$style.previewSlot,
-									{ [$style.previewSlotHidden]: !!preview.activeDataTableId.value },
+									{
+										[$style.previewSlotHidden]:
+											!!preview.activeDataTableId.value || !!preview.activeSetupWorkflowId.value,
+									},
 								]"
 								:workflow-id="preview.activeWorkflowId.value"
 								:refresh-key="preview.workflowRefreshKey.value"
@@ -1103,6 +1126,18 @@ function handleWorkflowFailures(report: WorkflowFailuresReport) {
 	flex: 1;
 	min-height: 0;
 	position: relative;
+}
+
+.setupRequiredState {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--spacing--xs);
+	padding: var(--spacing--xl);
+	text-align: center;
 }
 
 .previewSlot {

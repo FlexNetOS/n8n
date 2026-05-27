@@ -88,6 +88,102 @@ describe('useResourceRegistry', () => {
 			expect(resourceNameIndex.value.get('my workflow')?.id).toBe('wf-1');
 		});
 
+		test('marks workflow artifacts that still need setup', async () => {
+			const { messages, producedArtifacts } = setup();
+
+			messages.value = [
+				makeMessage({
+					agentTree: makeAgentNode({
+						toolCalls: [
+							makeToolCall({
+								toolName: 'workflows',
+								result: {
+									success: true,
+									workflowId: 'wf-setup',
+									workflowName: 'Needs setup',
+									setupRequirement: { status: 'required' },
+								},
+							}),
+						],
+					}),
+				}),
+			];
+			await nextTick();
+
+			expect(producedArtifacts.value.get('wf-setup')).toEqual(
+				expect.objectContaining({
+					type: 'workflow',
+					id: 'wf-setup',
+					name: 'Needs setup',
+					needsSetup: true,
+				}),
+			);
+		});
+
+		test('keeps setup-needed workflow marked when setup is deferred', async () => {
+			const { messages, producedArtifacts } = setup();
+
+			messages.value = [
+				makeMessage({
+					agentTree: makeAgentNode({
+						toolCalls: [
+							makeToolCall({
+								toolName: 'workflows',
+								result: {
+									success: true,
+									workflowId: 'wf-deferred',
+									workflowName: 'Deferred setup',
+									setupRequirement: { status: 'required' },
+								},
+							}),
+							makeToolCall({
+								toolName: 'workflows',
+								args: { action: 'setup', workflowId: 'wf-deferred' },
+								result: { success: true, deferred: true },
+							}),
+						],
+					}),
+				}),
+			];
+			await nextTick();
+
+			expect(producedArtifacts.value.get('wf-deferred')).toEqual(
+				expect.objectContaining({ needsSetup: true }),
+			);
+		});
+
+		test('clears setup-needed state after setup completes', async () => {
+			const { messages, producedArtifacts } = setup();
+
+			messages.value = [
+				makeMessage({
+					agentTree: makeAgentNode({
+						toolCalls: [
+							makeToolCall({
+								toolName: 'workflows',
+								result: {
+									success: true,
+									workflowId: 'wf-configured',
+									workflowName: 'Configured',
+									setupRequirement: { status: 'required' },
+								},
+							}),
+							makeToolCall({
+								toolName: 'workflows',
+								args: { action: 'setup', workflowId: 'wf-configured' },
+								result: { success: true, deferred: false },
+							}),
+						],
+					}),
+				}),
+			];
+			await nextTick();
+
+			expect(producedArtifacts.value.get('wf-configured')).toEqual(
+				expect.objectContaining({ needsSetup: false }),
+			);
+		});
+
 		test('falls back to args.name when result has no workflowName', async () => {
 			const { messages, producedArtifacts } = setup();
 

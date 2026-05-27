@@ -28,7 +28,9 @@ Use the saved build outcome as the routing source:
   credentials and a testable trigger; otherwise explain the blocker.
 - If `outcome.verificationReadiness.status === "needs_setup"`, call
   `workflows(action="setup")` so the user can configure the workflow through the
-  inline setup card in the AI Assistant panel.
+  inline setup card in the AI Assistant panel. If setup returns
+  `deferred: true`, verification has not run; complete the checkpoint as failed
+  with a setup-required summary instead of claiming execution succeeded.
 - If `outcome.verificationReadiness.status === "not_verifiable"`, use its
   guidance to decide whether to explain the blocker or ask the user to test
   manually.
@@ -65,7 +67,8 @@ expression is wrong against the production trigger output shape.
   user-visible surface. Do not tell the user to open the editor, use the canvas,
   or click a Setup button.
 - If setup returns `deferred: true`, respect the user's decision and do not
-  retry with `credentials(action="setup")` or other setup tools.
+  retry with `credentials(action="setup")` or other setup tools. If setup was
+  required before verification, do not mark verification as succeeded.
 
 ## Publish
 

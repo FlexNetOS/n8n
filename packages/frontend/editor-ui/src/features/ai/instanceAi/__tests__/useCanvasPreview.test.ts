@@ -384,10 +384,16 @@ describe('useCanvasPreview', () => {
 			expect(ctx.isPreviewVisible.value).toBe(true);
 		});
 
-		test('does not auto-open workflow preview while setup is required', async () => {
+		test('opens artifact tab without workflow preview while setup is required', async () => {
 			const ctx = setup();
 			ctx.thread.isStreaming = true;
-			registerWorkflow(ctx.thread, 'wf-needs-setup');
+			const entry: ResourceEntry = {
+				type: 'workflow',
+				id: 'wf-needs-setup',
+				name: 'Needs setup',
+				needsSetup: true,
+			};
+			ctx.thread.producedArtifacts = new Map([['wf-needs-setup', entry]]);
 
 			ctx.thread.messages = [
 				makeMessage({
@@ -409,8 +415,11 @@ describe('useCanvasPreview', () => {
 			await nextTick();
 
 			expect(ctx.allArtifactTabs.value.some((tab) => tab.id === 'wf-needs-setup')).toBe(true);
-			expect(ctx.activeTabId.value).toBeUndefined();
-			expect(ctx.isPreviewVisible.value).toBe(false);
+			expect(ctx.activeTabId.value).toBe('wf-needs-setup');
+			expect(ctx.activeWorkflowId.value).toBeNull();
+			expect(ctx.activeSetupWorkflowId.value).toBe('wf-needs-setup');
+			expect(ctx.activeSetupWorkflowName.value).toBe('Needs setup');
+			expect(ctx.isPreviewVisible.value).toBe(true);
 		});
 
 		test('does not auto-open while hydrating historical messages', async () => {
