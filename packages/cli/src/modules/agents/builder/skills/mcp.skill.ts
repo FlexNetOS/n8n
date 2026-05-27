@@ -16,74 +16,122 @@ export function mcpSkill(): RuntimeSkill {
 		description:
 			'Use when adding, removing, or updating MCP (Model Context Protocol) servers on the target agent.',
 		instructions: `\
+## Purpose
+
+Use this to manage external MCP server connections in the target agent config.
 MCP servers expose external tool catalogs to the target agent over HTTP. They
-live on the top-level \`mcpServers\` array. Each entry maps 1:1 to a connected
-MCP server.
+live on the top-level \`mcpServers\` array, and each entry maps 1:1 to a
+connected MCP server.
 
-When to use MCP vs n8n tools:
-- **MCP servers are preferred** for real-world integrations (e.g. GitHub,
-  Slack, Notion, Linear). Always check \`search_mcp_servers\` first.
-- Fall back to workflow or node tools only when no MCP server is available
+## Boundaries
+
+- For external integrations, check \`search_mcp_servers\` first and prefer a
+  registry-backed MCP server when available.
+- Fall back to workflow or node tools only when no suitable MCP server exists
   for the requested integration.
+- \`search_nodes\` does not return MCP servers; use
+  \`search_mcp_servers\` for MCP discovery.
 
-## Discovery and setup workflow
+## Workflow
+
+### Discovery and setup
 
 Follow these steps in order when adding an MCP server:
 
-1. **Search:** Call \`search_mcp_servers\` with keywords matching the
-   integration the user wants (e.g. \`["github"]\`, \`["slack"]\`).
+1. Search: call \`search_mcp_servers\` with queries matching the requested
+   integration (for example \`["github"]\`, \`["slack"]\`).
    The result includes \`name\`, \`url\`, \`transport\`, \`authentication\`,
-   \`credentialType\`, and a \`tools\` list for each matching server.
-2. **Credential:** Call \`ask_credential\` with the \`credentialType\` from
-   the search result. Never invent credential IDs.
-   If the user declines, omit the server entirely.
-3. **Verify:** Call \`verify_mcp_server\` with the server \`name\`, \`url\`,
-   \`transport\`, \`authentication\`, and the credential id from step 2.
-   On success it returns \`{ ok: true, tools: [{ name, description }] }\`.
-   Use the tool list to populate \`toolFilter\` or \`approval\` fields.
-   On failure, explain the error and ask the user to check URL or credentials.
-4. **Write config:** Call \`read_config\`, then \`patch_config\` to add the
-   server to \`mcpServers[]\` (two-step pattern below).
+   \`credentialType\`, \`tools\`, and optional \`metadata\`.
+2. Credential: for registry results, call \`ask_credential\` with the returned
+   \`credentialType\`. Never invent credential IDs.
+3. Verify: call \`verify_mcp_server\` with \`name\`, \`url\`, \`transport\`,
+   \`authentication\`, and (if applicable) \`credential\`.
+4. Write config: call \`read_config\`, then \`patch_config\` to add the entry
+   to \`mcpServers[]\` using the patch pattern below.
 
-If \`search_mcp_servers\` returns no results and the user provides a custom
-MCP server URL, skip step 1 and ask the user for URL, transport, and auth
-type. Then continue from step 2.
+If \`search_mcp_servers\` returns no matches and the user provides a custom
+server URL, skip the search result mapping and continue with manual
+transport/authentication plus credential selection.
 
-## Selecting credentials
+### mcpServers[] entry shape
 
-When the user asks for an MCP server from the registry, use the
-\`credentialType\` returned by \`search_mcp_servers\` directly.
+Each \`mcpServers[]\` entry supports:
 
-For custom MCP servers (not from registry), ask which credential type to use:
-OAuth2, Bearer Token, Header Auth, Multiple Headers Auth, or None.
-Use \`${ASK_QUESTION_TOOL_NAME}\` for asking. Based on response:
+- \`name\` (required, unique within \`mcpServers\`, 1-64 chars, /^[A-Za-z0-9_-]+$/)
+- \`url\` (required)
+- \`transport\`: \`"sse"\` | \`"streamableHttp"\` (default \`"streamableHttp"\`)
+- \`authentication\`: \`"none"\` | \`"bearerAuth"\` | \`"headerAuth"\` |
+  \`"multipleHeadersAuth"\` | \`"mcpOAuth2Api"\` |
+  string ending in \`"McpOAuth2Api"\` (default \`"none"\`)
+- \`credential\`: required when authentication !== \`"none"\` (must be the id
+  returned by \`ask_credential\`)
+- \`toolFilter\` (optional): \`{ mode: "allow" | "exclude", tools: string[] }\`,
+  matched against original (un-prefixed) tool names
+- \`approval\` (optional): \`{ mode: "global" }\` for all tools, or
+  \`{ mode: "selected", tools: [...] }\` for specific tools (must be non-empty)
+- \`connectionTimeoutMs\` (optional): 1-120000
+- \`metadata\` (optional): optional server-generated metadata. Do not use this
+  field unless explicitly instructed to do so by instructions
+
+Full schema reference:
+
+${mcpServerSchemaText}
+
+### Credential flow
+
+- For \`bearerAuth\`, call \`ask_credential\` with
+  \`credentialType: "httpBearerAuth"\`.
+- For \`headerAuth\`, call \`ask_credential\` with
+  \`credentialType: "httpHeaderAuth"\`.
+- For \`multipleHeadersAuth\`, call \`ask_credential\` with
+  \`credentialType: "httpMultipleHeadersAuth"\`.
+- For \`mcpOAuth2Api\`, call \`ask_credential\` with
+  \`credentialType: "mcpOAuth2Api"\`.
+- Never invent credential IDs. If the user declines, omit the server entirely
+  rather than persisting a stub.
+
+### Testing the connection
+
+Before writing to config, call \`verify_mcp_server\` with server \`name\`,
+\`url\`, \`transport\`, and (if applicable) the credential id from
+\`ask_credential\`.
+
+- Success returns \`{ ok: true, tools: [{ name, description }] }\`.
+- Use the returned tool list to populate \`toolFilter.tools\` or
+  \`approval.tools\` so the user does not need to type tool names manually.
+- Failure returns \`{ ok: false, error: "..." }\`.
+- If verification fails, explain the error and ask the user to check the URL
+  or credentials before proceeding.
+
+### Selecting credentials
+
+When using a registry-backed server, always use the \`credentialType\` returned
+by \`search_mcp_servers\`.
+
+For custom MCP servers, if credential type is unknown, ask the user which
+credential type to use (OAuth2, Bearer Token, Header Auth, Multiple Headers
+Auth, or None) via \`${ASK_QUESTION_TOOL_NAME}\`. Then map to:
+
 - \`bearerAuth\` -> \`ask_credential\` with \`credentialType: "httpBearerAuth"\`
 - \`headerAuth\` -> \`ask_credential\` with \`credentialType: "httpHeaderAuth"\`
 - \`multipleHeadersAuth\` -> \`ask_credential\` with
   \`credentialType: "httpMultipleHeadersAuth"\`
 - \`mcpOAuth2Api\` -> \`ask_credential\` with \`credentialType: "mcpOAuth2Api"\`
 
-## mcpServers[] entry schema
+### Patch pattern
 
-${mcpServerSchemaText}
-
-Use \`metadata.nodeTypeName\` from \`search_mcp_servers\` result when available
-(enables the correct UI form for editing).
-When a server comes from \`search_mcp_servers\`, include
-\`metadata: { nodeTypeName: <result.nodeTypeName> }\` in the \`mcpServers[]\`
-entry. For custom/manual MCP URL setup, do NOT invent \`metadata.nodeTypeName\`;
-
-Patch pattern (two-step):
 1. Initialize the array if missing:
    \`{ "op": "add", "path": "/mcpServers", "value": [] }\`
 2. Append each server:
    \`{ "op": "add", "path": "/mcpServers/-", "value": { ... } }\`
 
-Constraints:
+## Gotchas
+
 - Server \`name\` must be unique across \`mcpServers\` within an agent.
-- \`search_nodes\` does NOT return MCP servers. Always use
-  \`search_mcp_servers\` for MCP discovery.
-- Never fabricate \`metadata.nodeTypeName\`. Use it only when returned by
-  \`search_mcp_servers\`.`,
+- Never invent credential IDs. If the user declines, omit the server entirely.
+- Never fabricate \`metadata.nodeTypeName\`.
+- When \`search_mcp_servers\` returns \`metadata.nodeTypeName\`, include
+  \`metadata: { nodeTypeName: <result.nodeTypeName> }\` in the entry so the UI
+  can render the correct server form.`,
 	};
 }

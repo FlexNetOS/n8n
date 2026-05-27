@@ -84,7 +84,8 @@ Before these specialized tasks, call \`load_skill\` with
 ${lines.join('\n')}
 
 Do not use \`create_skill\` for your own builder guidance. \`create_skill\`
-creates a skill for the target agent only.`;
+creates a skill for the target agent only.
+`;
 }
 
 export const INTERACTIVE_TOOLS_SECTION = `\
