@@ -148,6 +148,7 @@ import {
 	type SpawnBackgroundTaskResult,
 	type SpawnManagedBackgroundTaskOptions,
 	type TerminalOutcome,
+	type WorkflowBuildOutcome,
 } from '@n8n/instance-ai';
 
 import { InstanceAiService } from '../instance-ai.service';
@@ -253,8 +254,8 @@ function createBackgroundTaskFollowUpService({
 		taskId: 'task-1',
 		threadId: 'thread-a',
 		runId: 'run-1',
-		role: 'workflow-builder',
-		agentId: 'agent-builder',
+		role: 'research',
+		agentId: 'agent-research',
 		status: 'completed',
 		result: 'done',
 		startedAt: 0,
@@ -649,6 +650,7 @@ type TerminalGuardOrderServiceInternals = {
 		cancelThread: jest.Mock;
 		clearActiveRun: jest.Mock;
 		hasSuspendedRun: jest.Mock;
+		suspendRun: jest.Mock;
 	};
 	eventBus: {
 		events: InstanceAiEvent[];
@@ -667,6 +669,7 @@ type TerminalGuardOrderServiceInternals = {
 	countCreditsIfFirst: jest.Mock;
 	maybeFinalizeRunTraceRoot: jest.Mock;
 	schedulePlannedTasks: jest.Mock;
+	finalizePlannedBuildFollowUp: jest.Mock;
 	drainPendingCheckpointReentries: jest.Mock;
 	processResumedStream: (
 		agent: unknown,
@@ -681,6 +684,13 @@ type TerminalGuardOrderServiceInternals = {
 			abortController: AbortController;
 			snapshotStorage: unknown;
 			tracing?: InstanceAiTraceContext;
+			plannedBuild?: {
+				taskId: string;
+				workItemId: string;
+				title: string;
+				spec: string;
+				workflowId?: string;
+			};
 		},
 	) => Promise<void>;
 };
@@ -719,6 +729,7 @@ function createTerminalGuardOrderService(): TerminalGuardOrderServiceInternals {
 		cancelThread: jest.fn(),
 		clearActiveRun: jest.fn(),
 		hasSuspendedRun: jest.fn(() => true),
+		suspendRun: jest.fn(),
 	};
 	service.eventBus = {
 		events,
@@ -741,6 +752,7 @@ function createTerminalGuardOrderService(): TerminalGuardOrderServiceInternals {
 	service.countCreditsIfFirst = jest.fn(async () => {});
 	service.maybeFinalizeRunTraceRoot = jest.fn(async () => {});
 	service.schedulePlannedTasks = jest.fn(async () => {});
+	service.finalizePlannedBuildFollowUp = jest.fn(async () => {});
 	service.drainPendingCheckpointReentries = jest.fn(async () => {});
 	return service;
 }
@@ -768,9 +780,9 @@ function makeTerminalOutcome(overrides: Partial<TerminalOutcome> = {}): Terminal
 		messageGroupId: 'group-1',
 		correlationId: 'message-1',
 		taskId: 'task-1',
-		agentId: 'agent-builder',
+		agentId: 'agent-research',
 		status: 'completed',
-		userFacingMessage: 'The background workflow-builder task finished.',
+		userFacingMessage: 'The background research task finished.',
 		createdAt: '2026-05-01T00:00:00.000Z',
 		...overrides,
 	};
@@ -1194,8 +1206,8 @@ describe('InstanceAiService — background task auto-follow-up', () => {
 			{
 				taskId: 'task-1',
 				threadId: 'thread-a',
-				agentId: 'agent-builder',
-				role: 'workflow-builder',
+				agentId: 'agent-research',
+				role: 'research',
 				run: async () => 'done',
 			},
 			{},
@@ -1203,7 +1215,7 @@ describe('InstanceAiService — background task auto-follow-up', () => {
 		);
 		await getSpawnOptions().onSettled?.(task);
 
-		expect(result).toEqual({ status: 'started', taskId: 'task-1', agentId: 'agent-builder' });
+		expect(result).toEqual({ status: 'started', taskId: 'task-1', agentId: 'agent-research' });
 		expect(service.startInternalFollowUpRun).toHaveBeenCalledWith(
 			fakeUser,
 			'thread-a',
@@ -1222,8 +1234,8 @@ describe('InstanceAiService — background task auto-follow-up', () => {
 			{
 				taskId: 'task-1',
 				threadId: 'thread-a',
-				agentId: 'agent-builder',
-				role: 'workflow-builder',
+				agentId: 'agent-research',
+				role: 'research',
 				run: async () => 'done',
 			},
 			{},
@@ -1477,6 +1489,7 @@ type ResolveConfirmationServiceInternals = {
 		requestId: string,
 		request: { kind: 'approval'; approved: boolean; userInput?: string },
 	) => Promise<boolean>;
+	resumeSuspendedRun: jest.Mock<Promise<boolean>, [string, string, { approved: boolean }]>;
 	revalidateActiveUser: jest.Mock<Promise<User | null>, [string]>;
 	cancelRun: jest.Mock<void, [string]>;
 	runState: {
@@ -1491,6 +1504,9 @@ function createResolveConfirmationService(): ResolveConfirmationServiceInternals
 	const service = Object.create(
 		InstanceAiService.prototype,
 	) as unknown as ResolveConfirmationServiceInternals;
+	service.resumeSuspendedRun = jest.fn<Promise<boolean>, [string, string, { approved: boolean }]>(
+		async () => true,
+	);
 	service.revalidateActiveUser = jest.fn();
 	service.cancelRun = jest.fn();
 	service.runState = {
@@ -1525,9 +1541,11 @@ function createPlannedTaskSchedulerService(): {
 		tick: jest.Mock;
 		revertToActive: jest.Mock;
 		revertCheckpointToPlanned: jest.Mock;
+		revertWorkflowBuildToPlanned: jest.Mock;
 		markRunning: jest.Mock;
+		markFailed: jest.Mock;
 	};
-	graph: { planRunId: string; messageGroupId: string; tasks: Array<{ id: string }> };
+	graph: { planRunId: string; messageGroupId: string; tasks: Array<Record<string, unknown>> };
 } {
 	const service = Object.create(
 		InstanceAiService.prototype,
@@ -1538,7 +1556,9 @@ function createPlannedTaskSchedulerService(): {
 		tick: jest.fn(async () => ({ type: 'none' })),
 		revertToActive: jest.fn(async () => {}),
 		revertCheckpointToPlanned: jest.fn(async () => {}),
+		revertWorkflowBuildToPlanned: jest.fn(async () => {}),
 		markRunning: jest.fn(async () => {}),
+		markFailed: jest.fn(async () => {}),
 	};
 
 	service.revalidateActiveUser = jest.fn();
@@ -1594,6 +1614,12 @@ function createSuspendedRunResumeService(): SuspendedRunResumeServiceInternals {
 			modelId: undefined,
 			messageGroupId: 'group-1',
 			checkpoint: undefined,
+			plannedBuild: {
+				taskId: 'build-1',
+				workItemId: 'wi-1',
+				title: 'Build workflow',
+				spec: 'Build it',
+			},
 		})),
 		activateSuspendedRun: jest.fn(),
 	};
@@ -1656,6 +1682,7 @@ describe('InstanceAiService — resolveConfirmation', () => {
 	it('resolves the pending sub-agent confirmation when the user is still authorized', async () => {
 		const service = createResolveConfirmationService();
 		service.revalidateActiveUser.mockResolvedValue({ id: 'user-1' } as unknown as User);
+		service.runState.findSuspendedByRequestId.mockReturnValue(undefined);
 		service.runState.resolvePendingConfirmation.mockReturnValue(true);
 
 		const result = await service.resolveConfirmation('user-1', 'req-1', approval);
@@ -1668,6 +1695,27 @@ describe('InstanceAiService — resolveConfirmation', () => {
 		);
 		expect(service.runState.rejectPendingConfirmation).not.toHaveBeenCalled();
 		expect(service.cancelRun).not.toHaveBeenCalled();
+		expect(service.resumeSuspendedRun).not.toHaveBeenCalled();
+	});
+
+	it('resumes matching suspended runs before resolving inline confirmations', async () => {
+		const service = createResolveConfirmationService();
+		service.revalidateActiveUser.mockResolvedValue({ id: 'user-1' } as unknown as User);
+		service.runState.findSuspendedByRequestId.mockReturnValue({
+			threadId: 'thread-1',
+			user: { id: 'user-1' },
+		});
+		service.runState.resolvePendingConfirmation.mockReturnValue(true);
+
+		const result = await service.resolveConfirmation('user-1', 'req-1', approval);
+
+		expect(result).toBe(true);
+		expect(service.resumeSuspendedRun).toHaveBeenCalledWith(
+			'user-1',
+			'req-1',
+			expect.objectContaining({ approved: true }),
+		);
+		expect(service.runState.resolvePendingConfirmation).not.toHaveBeenCalled();
 	});
 });
 
@@ -1706,6 +1754,37 @@ describe('InstanceAiService — planned task user revalidation', () => {
 			true,
 		);
 	});
+
+	it('reverts workflow-build tasks to planned when the follow-up run does not start', async () => {
+		const { service, plannedTaskService, graph } = createPlannedTaskSchedulerService();
+		const buildTask = {
+			id: 'wf-1',
+			kind: 'build-workflow',
+			title: 'Build workflow',
+			spec: 'Build the requested workflow',
+			deps: [],
+			status: 'planned',
+		};
+		graph.tasks = [buildTask];
+		service.revalidateActiveUser.mockResolvedValue(fakeUser);
+		service.startInternalFollowUpRun.mockResolvedValue('');
+		plannedTaskService.tick.mockResolvedValue({
+			type: 'orchestrate-build-workflow',
+			graph,
+			tasks: [buildTask],
+		});
+
+		await service.doSchedulePlannedTasks(fakeUser, 'thread-a');
+
+		expect(plannedTaskService.markRunning).toHaveBeenCalledWith('thread-a', 'wf-1', {
+			agentId: 'agent-001',
+		});
+		expect(plannedTaskService.revertWorkflowBuildToPlanned).toHaveBeenCalledWith(
+			'thread-a',
+			'wf-1',
+		);
+		expect(plannedTaskService.markFailed).not.toHaveBeenCalled();
+	});
 });
 
 describe('InstanceAiService — suspended run user revalidation', () => {
@@ -1737,7 +1816,10 @@ describe('InstanceAiService — suspended run user revalidation', () => {
 		expect(service.processResumedStream).toHaveBeenCalledWith(
 			expect.any(Object),
 			expect.objectContaining({ approved: true }),
-			expect.objectContaining({ user: freshUser }),
+			expect.objectContaining({
+				user: freshUser,
+				plannedBuild: expect.objectContaining({ taskId: 'build-1' }),
+			}),
 		);
 	});
 });
@@ -2056,6 +2138,101 @@ describe('InstanceAiService — terminal response guard wiring', () => {
 		expect(service.telemetry.track).toHaveBeenCalledWith('Builder satisfied user intent', {
 			thread_id: 'thread-a',
 		});
+	});
+
+	it('finalizes planned build follow-ups after a resumed planned-build run exits', async () => {
+		const service = createTerminalGuardOrderService();
+		const abortController = new AbortController();
+		service.runState.hasSuspendedRun.mockReturnValue(false);
+		jest.mocked(resumeAgentRun).mockResolvedValueOnce({
+			status: 'completed',
+			agentRunId: 'agent-run-1',
+			text: Promise.resolve('done'),
+			workSummary: { toolCalls: [], totalToolCalls: 0, totalToolErrors: 0 },
+		});
+
+		await service.processResumedStream(
+			{},
+			{},
+			{
+				runId: 'run-1',
+				agentRunId: 'agent-run-1',
+				threadId: 'thread-a',
+				user: fakeUser,
+				toolCallId: 'tool-call-1',
+				signal: abortController.signal,
+				abortController,
+				snapshotStorage: {},
+				plannedBuild: {
+					taskId: 'build-1',
+					workItemId: 'wi-1',
+					title: 'Build workflow',
+					spec: 'Build it',
+				},
+			},
+		);
+
+		expect(service.finalizePlannedBuildFollowUp).toHaveBeenCalledWith(
+			fakeUser,
+			'thread-a',
+			'build-1',
+			undefined,
+		);
+		expect(service.schedulePlannedTasks).not.toHaveBeenCalled();
+	});
+
+	it('recovers a planned build follow-up when the workflow was saved but task reporting missed', async () => {
+		const recoveredSuccess = {
+			result: 'Workflow built: Lead intake.',
+			outcome: {
+				workItemId: 'wi-1',
+				taskId: 'build-1',
+				workflowId: 'wf-1',
+				submitted: true,
+				triggerType: 'manual_or_testable',
+				needsUserInput: false,
+				summary: 'Workflow built: Lead intake.',
+				verificationReadiness: { status: 'ready' },
+				setupRequirement: { status: 'not_required' },
+			} as WorkflowBuildOutcome,
+		};
+		const plannedTaskService = {
+			getGraph: jest
+				.fn()
+				.mockResolvedValueOnce({ tasks: [{ id: 'build-1', status: 'running' }] })
+				.mockResolvedValueOnce({ tasks: [{ id: 'build-1', status: 'succeeded' }] }),
+			markSucceeded: jest.fn().mockResolvedValue({ tasks: [] }),
+			markFailed: jest.fn(),
+		};
+		const service = Object.create(InstanceAiService.prototype) as unknown as {
+			finalizePlannedBuildFollowUp: (
+				user: User,
+				threadId: string,
+				buildTaskId: string,
+				recovered?: typeof recoveredSuccess,
+			) => Promise<void>;
+			createPlannedTaskState: jest.Mock;
+			syncPlannedTasksToUi: jest.Mock;
+			schedulePlannedTasks: jest.Mock;
+			logger: { warn: jest.Mock; error: jest.Mock };
+		};
+		service.createPlannedTaskState = jest.fn(async () => ({ plannedTaskService }));
+		service.syncPlannedTasksToUi = jest.fn();
+		service.schedulePlannedTasks = jest.fn();
+		service.logger = { warn: jest.fn(), error: jest.fn() };
+
+		await service.finalizePlannedBuildFollowUp(fakeUser, 'thread-a', 'build-1', recoveredSuccess);
+
+		expect(plannedTaskService.markSucceeded).toHaveBeenCalledWith(
+			'thread-a',
+			'build-1',
+			recoveredSuccess,
+		);
+		expect(plannedTaskService.markFailed).not.toHaveBeenCalled();
+		expect(service.syncPlannedTasksToUi).toHaveBeenCalledWith('thread-a', {
+			tasks: [{ id: 'build-1', status: 'succeeded' }],
+		});
+		expect(service.schedulePlannedTasks).toHaveBeenCalledWith(fakeUser, 'thread-a');
 	});
 
 	it('rebinds resumed agents to resume trace telemetry', async () => {

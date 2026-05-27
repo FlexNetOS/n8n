@@ -1,4 +1,4 @@
-import { Agent, Memory } from '@n8n/agents';
+import { Agent, Memory, type RuntimeSkillSource } from '@n8n/agents';
 
 import {
 	addSafeMcpTools,
@@ -40,6 +40,22 @@ function splitDeferredTools(
 	}
 
 	return { coreTools, deferredTools };
+}
+
+function trackLoadedRuntimeSkills(
+	source: RuntimeSkillSource,
+	context: CreateInstanceAgentOptions['context'],
+): RuntimeSkillSource {
+	const loadedSkills = (context.loadedSkills ??= new Set<string>());
+
+	return {
+		...source,
+		loadSkill: async (skillId) => {
+			const skill = await source.loadSkill(skillId);
+			if (skill) loadedSkills.add(skill.id);
+			return skill;
+		},
+	};
 }
 
 export async function createInstanceAgent(options: CreateInstanceAgentOptions): Promise<Agent> {
@@ -180,7 +196,7 @@ export async function createInstanceAgent(options: CreateInstanceAgentOptions): 
 	}
 	const runtimeSkills = orchestrationContext?.runtimeSkills;
 	if (hasRuntimeSkills(runtimeSkills)) {
-		agent.skills(runtimeSkills);
+		agent.skills(trackLoadedRuntimeSkills(runtimeSkills, context));
 	}
 	if (telemetry) {
 		agent.telemetry(telemetry);

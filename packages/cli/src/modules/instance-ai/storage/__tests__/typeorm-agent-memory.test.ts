@@ -56,6 +56,41 @@ function createMemory(deps: {
 }
 
 describe('TypeORMAgentMemory', () => {
+	it('keeps pending user input rows out of agent history recall', async () => {
+		const createdAt = new Date();
+		const messageRepo = mock<InstanceAiMessageRepository>();
+		messageRepo.find.mockResolvedValueOnce([
+			makeMessageRow({
+				id: 'message-1',
+				content: JSON.stringify({
+					id: 'message-1',
+					role: 'user',
+					content: [{ type: 'text', text: 'Build a Slack workflow' }],
+					createdAt,
+					metadata: { n8nPendingUserInput: true },
+				}),
+				role: 'user',
+				createdAt,
+			}),
+			makeMessageRow({
+				id: 'message-2',
+				content: JSON.stringify({
+					id: 'message-2',
+					role: 'assistant',
+					content: [{ type: 'text', text: 'Done.' }],
+					createdAt,
+				}),
+				role: 'assistant',
+				createdAt,
+			}),
+		]);
+		const { memory } = createMemory({ messageRepo });
+
+		await expect(memory.getMessages('thread-1')).resolves.toEqual([
+			expect.objectContaining({ id: 'message-2', role: 'assistant' }),
+		]);
+	});
+
 	it('logs and skips invalid native message rows', async () => {
 		const messageRepo = mock<InstanceAiMessageRepository>();
 		messageRepo.find.mockResolvedValueOnce([makeMessageRow()]);
