@@ -1,15 +1,19 @@
 import { ImportPackageRequestDto } from '../import-package-request.dto';
 
 describe('ImportPackageRequestDto', () => {
-	it('accepts omitted routing fields', () => {
-		expect(ImportPackageRequestDto.safeParse({}).success).toBe(true);
+	it('accepts omitted routing fields and defaults credentialMatchingMode to id-only', () => {
+		const result = ImportPackageRequestDto.safeParse({});
+		expect(result.success).toBe(true);
+		if (result.success) {
+			expect(result.data).toEqual({ credentialMatchingMode: 'id-only' });
+		}
 	});
 
 	it('treats empty projectId and folderId as omitted', () => {
 		const result = ImportPackageRequestDto.safeParse({ projectId: '', folderId: '   ' });
 		expect(result.success).toBe(true);
 		if (result.success) {
-			expect(result.data).toEqual({});
+			expect(result.data).toEqual({ credentialMatchingMode: 'id-only' });
 		}
 	});
 
@@ -23,6 +27,7 @@ describe('ImportPackageRequestDto', () => {
 			expect(result.data).toEqual({
 				projectId: 'proj-1',
 				folderId: 'fld-1',
+				credentialMatchingMode: 'id-only',
 			});
 		}
 	});
@@ -34,8 +39,17 @@ describe('ImportPackageRequestDto', () => {
 		});
 		expect(result.success).toBe(true);
 		if (result.success) {
-			expect(result.data).toEqual({ projectId: 'proj-1' });
+			expect(result.data).toEqual({
+				projectId: 'proj-1',
+				credentialMatchingMode: 'id-only',
+			});
 		}
+	});
+
+	it('rejects unsupported credentialMatchingMode values', () => {
+		expect(
+			ImportPackageRequestDto.safeParse({ credentialMatchingMode: 'name-and-type' }).success,
+		).toBe(false);
 	});
 
 	it.each([
