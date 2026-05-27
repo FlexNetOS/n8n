@@ -20,6 +20,7 @@ import { faker } from '@faker-js/faker';
 import type { INodeUi } from '@/Interface';
 import type { IUsedCredential } from '@/features/credentials/credentials.types';
 import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
+import { useCredentialsStore } from '@/features/credentials/credentials.store';
 
 const mockDocumentStoreUsedCredentials: Record<string, IUsedCredential> = {};
 
@@ -28,8 +29,8 @@ const mockDocumentStore = {
 	settings: {},
 	pinnedDataByNodeName: {},
 	usedCredentials: mockDocumentStoreUsedCredentials,
-	allNodes: [],
-	workflowTriggerNodes: [],
+	allNodes: [] as INodeUi[],
+	workflowTriggerNodes: [] as INodeUi[],
 	getNodeByName: vi.fn(),
 	setNodeIssue: vi.fn(),
 	updateNodeProperties: vi.fn(),
@@ -719,6 +720,250 @@ describe('useNodeHelpers()', () => {
 			const result = getNodeIssues(nodeTypeWithCreds, node, mockWorkflow, ['parameters']);
 
 			expect(result?.credentials?.googlePalmApi).toBeDefined();
+		});
+	});
+
+	describe('private credential trigger-compatibility', () => {
+		const NOTION_API = 'notionApi';
+		const MANUAL_TRIGGER = 'n8n-nodes-base.manualTrigger';
+		const MANUAL_CHAT_TRIGGER = '@n8n/n8n-nodes-langchain.manualChatTrigger';
+		const WEBHOOK_TRIGGER = 'n8n-nodes-base.webhook';
+
+		const notionNodeType: INodeTypeDescription = {
+			displayName: 'Notion',
+			name: 'notion',
+			group: ['transform'],
+			version: 1,
+			description: 'Notion node',
+			defaults: { name: 'Notion' },
+			inputs: [NodeConnectionTypes.Main],
+			outputs: [NodeConnectionTypes.Main],
+			credentials: [{ name: NOTION_API, required: true }],
+			properties: [],
+		};
+
+		const buildNode = (): INodeUi =>
+			createTestNode({
+				type: 'notion',
+				credentials: { [NOTION_API]: { id: 'cred-1', name: 'My Notion' } },
+			});
+
+		const buildTriggerNode = (type: string, overrides: Partial<INodeUi> = {}): INodeUi =>
+			createTestNode({ type, ...overrides });
+
+		const mockSelectedCredential = (isResolvable: boolean) => {
+			const credentialsStore = mockedStore(useCredentialsStore);
+			credentialsStore.getCredentialTypeByName = vi
+				.fn()
+				.mockReturnValue({ name: NOTION_API, displayName: 'Notion API' });
+			credentialsStore.getCredentialsByType = vi
+				.fn()
+				.mockReturnValue([
+					{ id: 'cred-1', name: 'My Notion', type: NOTION_API, isResolvable } as never,
+				]);
+			mockedStore(useNodeTypesStore).getNodeType = vi.fn().mockReturnValue(notionNodeType);
+		};
+
+		afterEach(() => {
+			mockDocumentStore.workflowTriggerNodes = [];
+		});
+
+		it('does not warn when a private credential is used under a manual trigger', () => {
+			mockSelectedCredential(true);
+			mockDocumentStore.workflowTriggerNodes = [buildTriggerNode(MANUAL_TRIGGER)];
+
+			const { getNodeCredentialIssues } = useNodeHelpers();
+			const result = getNodeCredentialIssues(buildNode(), notionNodeType);
+
+			expect(result).toBeNull();
+		});
+
+		it('does not warn when a private credential is used under a manual chat trigger', () => {
+			mockSelectedCredential(true);
+			mockDocumentStore.workflowTriggerNodes = [buildTriggerNode(MANUAL_CHAT_TRIGGER)];
+
+			const { getNodeCredentialIssues } = useNodeHelpers();
+			const result = getNodeCredentialIssues(buildNode(), notionNodeType);
+
+			expect(result).toBeNull();
+		});
+
+		it('warns when a private credential is used under a non-manual trigger', () => {
+			mockSelectedCredential(true);
+			mockDocumentStore.workflowTriggerNodes = [buildTriggerNode(WEBHOOK_TRIGGER)];
+
+			const { getNodeCredentialIssues } = useNodeHelpers();
+			const result = getNodeCredentialIssues(buildNode(), notionNodeType);
+
+			expect(result?.credentials?.[NOTION_API]).toEqual([
+				'Private credentials only work in manually triggered workflows. Change the trigger to a Manual trigger, or switch this credential to Static.',
+			]);
+		});
+
+		it('does not warn when a static (non-resolvable) credential is used under a non-manual trigger', () => {
+			mockSelectedCredential(false);
+			mockDocumentStore.workflowTriggerNodes = [buildTriggerNode(WEBHOOK_TRIGGER)];
+
+			const { getNodeCredentialIssues } = useNodeHelpers();
+			const result = getNodeCredentialIssues(buildNode(), notionNodeType);
+
+			expect(result).toBeNull();
+		});
+
+		it('ignores disabled non-manual triggers when computing compatibility', () => {
+			mockSelectedCredential(true);
+			mockDocumentStore.workflowTriggerNodes = [
+				buildTriggerNode(WEBHOOK_TRIGGER, { disabled: true }),
+				buildTriggerNode(MANUAL_TRIGGER),
+			];
+
+			const { getNodeCredentialIssues } = useNodeHelpers();
+			const result = getNodeCredentialIssues(buildNode(), notionNodeType);
+
+			expect(result).toBeNull();
+		});
+
+		it('does not warn when no triggers are present', () => {
+			mockSelectedCredential(true);
+			mockDocumentStore.workflowTriggerNodes = [];
+
+			const { getNodeCredentialIssues } = useNodeHelpers();
+			const result = getNodeCredentialIssues(buildNode(), notionNodeType);
+
+			expect(result).toBeNull();
+		});
+
+		it('warns when any trigger in a multi-trigger workflow is non-manual', () => {
+			mockSelectedCredential(true);
+			mockDocumentStore.workflowTriggerNodes = [
+				buildTriggerNode(MANUAL_TRIGGER),
+				buildTriggerNode(WEBHOOK_TRIGGER),
+			];
+
+			const { getNodeCredentialIssues } = useNodeHelpers();
+			const result = getNodeCredentialIssues(buildNode(), notionNodeType);
+
+			expect(result?.credentials?.[NOTION_API]?.[0]).toContain(
+				'Private credentials only work in manually triggered workflows',
+			);
+		});
+
+		describe('HTTP Request node generic / predefined credential auth', () => {
+			const OAUTH2_API = 'oAuth2Api';
+
+			// Mirrors the real HTTP Request type description: the dynamic auth types
+			// (oAuth2Api, httpBasicAuth, ...) are NOT declared on the node type — only
+			// httpSslAuth is. The dynamic credential is chosen via parameters.
+			const httpRequestNodeType: INodeTypeDescription = {
+				displayName: 'HTTP Request',
+				name: 'httpRequest',
+				group: ['core'],
+				version: 4.4,
+				description: 'HTTP Request node',
+				defaults: { name: 'HTTP Request' },
+				inputs: [NodeConnectionTypes.Main],
+				outputs: [NodeConnectionTypes.Main],
+				credentials: [
+					{
+						name: 'httpSslAuth',
+						required: true,
+						displayOptions: { show: { provideSslCertificates: [true] } },
+					},
+				],
+				properties: [],
+			};
+
+			const buildGenericAuthNode = (): INodeUi =>
+				createTestNode({
+					type: 'httpRequest',
+					typeVersion: 4.4,
+					parameters: {
+						authentication: 'genericCredentialType',
+						genericAuthType: OAUTH2_API,
+					},
+					credentials: { [OAUTH2_API]: { id: 'cred-1', name: 'My OAuth2' } },
+				});
+
+			const buildPredefinedAuthNode = (): INodeUi =>
+				createTestNode({
+					type: 'httpRequest',
+					typeVersion: 4.4,
+					parameters: {
+						authentication: 'predefinedCredentialType',
+						nodeCredentialType: OAUTH2_API,
+					},
+					credentials: { [OAUTH2_API]: { id: 'cred-1', name: 'My OAuth2' } },
+				});
+
+			const mockCredentialResolution = (isResolvable: boolean) => {
+				const credentialsStore = mockedStore(useCredentialsStore);
+				credentialsStore.getCredentialTypeByName = vi
+					.fn()
+					.mockReturnValue({ name: OAUTH2_API, displayName: 'OAuth2 API' });
+				credentialsStore.getCredentialsByType = vi
+					.fn()
+					.mockReturnValue([
+						{ id: 'cred-1', name: 'My OAuth2', type: OAUTH2_API, isResolvable } as never,
+					]);
+				credentialsStore.getCredentialById = vi
+					.fn()
+					.mockReturnValue({ id: 'cred-1', name: 'My OAuth2', type: OAUTH2_API, isResolvable });
+				mockedStore(useNodeTypesStore).getNodeType = vi.fn().mockReturnValue(httpRequestNodeType);
+			};
+
+			it('warns when a private credential is bound via genericCredentialType under a non-manual trigger', () => {
+				mockCredentialResolution(true);
+				mockDocumentStore.workflowTriggerNodes = [buildTriggerNode(WEBHOOK_TRIGGER)];
+
+				const { getNodeCredentialIssues } = useNodeHelpers();
+				const result = getNodeCredentialIssues(buildGenericAuthNode(), httpRequestNodeType);
+
+				expect(result?.credentials?.[OAUTH2_API]).toEqual([
+					'Private credentials only work in manually triggered workflows. Change the trigger to a Manual trigger, or switch this credential to Static.',
+				]);
+			});
+
+			it('does not warn when a static credential is bound via genericCredentialType under a non-manual trigger', () => {
+				mockCredentialResolution(false);
+				mockDocumentStore.workflowTriggerNodes = [buildTriggerNode(WEBHOOK_TRIGGER)];
+
+				const { getNodeCredentialIssues } = useNodeHelpers();
+				const result = getNodeCredentialIssues(buildGenericAuthNode(), httpRequestNodeType);
+
+				expect(result).toBeNull();
+			});
+
+			it('does not warn when a private credential is bound via genericCredentialType under a manual trigger', () => {
+				mockCredentialResolution(true);
+				mockDocumentStore.workflowTriggerNodes = [buildTriggerNode(MANUAL_TRIGGER)];
+
+				const { getNodeCredentialIssues } = useNodeHelpers();
+				const result = getNodeCredentialIssues(buildGenericAuthNode(), httpRequestNodeType);
+
+				expect(result).toBeNull();
+			});
+
+			it('warns when a private credential is bound via predefinedCredentialType under a non-manual trigger', () => {
+				mockCredentialResolution(true);
+				mockDocumentStore.workflowTriggerNodes = [buildTriggerNode(WEBHOOK_TRIGGER)];
+
+				const { getNodeCredentialIssues } = useNodeHelpers();
+				const result = getNodeCredentialIssues(buildPredefinedAuthNode(), httpRequestNodeType);
+
+				expect(result?.credentials?.[OAUTH2_API]).toEqual([
+					'Private credentials only work in manually triggered workflows. Change the trigger to a Manual trigger, or switch this credential to Static.',
+				]);
+			});
+
+			it('does not warn when a static credential is bound via predefinedCredentialType under a non-manual trigger', () => {
+				mockCredentialResolution(false);
+				mockDocumentStore.workflowTriggerNodes = [buildTriggerNode(WEBHOOK_TRIGGER)];
+
+				const { getNodeCredentialIssues } = useNodeHelpers();
+				const result = getNodeCredentialIssues(buildPredefinedAuthNode(), httpRequestNodeType);
+
+				expect(result).toBeNull();
+			});
 		});
 	});
 

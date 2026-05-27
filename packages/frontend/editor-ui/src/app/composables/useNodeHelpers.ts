@@ -6,7 +6,7 @@ import {
 	PLACEHOLDER_FILLED_AT_EXECUTION_TIME,
 } from '@/app/constants';
 
-import { NodeHelpers, NodeConnectionTypes } from 'n8n-workflow';
+import { NodeHelpers, NodeConnectionTypes, MANUAL_TRIGGER_NODE_TYPES } from 'n8n-workflow';
 import type {
 	INodeProperties,
 	INodeCredentialDescription,
@@ -413,6 +413,27 @@ export function useNodeHelpers() {
 		return null;
 	}
 
+	function workflowHasIncompatibleTrigger(): boolean {
+		const triggers = workflowDocumentStore.value.workflowTriggerNodes;
+		return triggers.some(
+			(trigger) => !trigger.disabled && !MANUAL_TRIGGER_NODE_TYPES.includes(trigger.type),
+		);
+	}
+
+	function getPrivateCredentialIssueText(
+		credentialRef: INodeCredentialsDetails | string | undefined,
+	): string[] | null {
+		if (!credentialRef) return null;
+		if (typeof credentialRef === 'object' && credentialRef.__aiGatewayManaged) return null;
+		const id = typeof credentialRef === 'string' ? null : credentialRef.id;
+		if (!id) return null;
+		const stored = credentialsStore.getCredentialById(id);
+		if (stored?.isResolvable === true && workflowHasIncompatibleTrigger()) {
+			return [i18n.baseText('nodeIssues.credentials.privateRequiresManualTrigger')];
+		}
+		return null;
+	}
+
 	function getNodeCredentialIssues(
 		node: INodeUi,
 		nodeType?: INodeTypeDescription,
@@ -446,6 +467,13 @@ export function useNodeHelpers() {
 			return credential ? reportUnsetCredential(credential) : null;
 		}
 
+		if (authentication === 'genericCredentialType' && genericAuthType !== '') {
+			const privateIssue = getPrivateCredentialIssueText(node.credentials?.[genericAuthType]);
+			if (privateIssue) {
+				foundIssues[genericAuthType] = privateIssue;
+			}
+		}
+
 		if (
 			hasProxyAuth(node) &&
 			authentication === 'predefinedCredentialType' &&
@@ -477,6 +505,17 @@ export function useNodeHelpers() {
 		) {
 			const credential = credentialsStore.getCredentialTypeByName(nodeCredentialType);
 			return credential ? reportUnsetCredential(credential) : null;
+		}
+
+		if (
+			hasProxyAuth(node) &&
+			authentication === 'predefinedCredentialType' &&
+			nodeCredentialType !== ''
+		) {
+			const privateIssue = getPrivateCredentialIssueText(node.credentials?.[nodeCredentialType]);
+			if (privateIssue) {
+				foundIssues[nodeCredentialType] = privateIssue;
+			}
 		}
 
 		for (const credentialTypeDescription of localNodeType.credentials) {
@@ -525,6 +564,11 @@ export function useNodeHelpers() {
 						(credentialData) => credentialData.id === selectedCredentials.id,
 					);
 					if (idMatch) {
+						if (idMatch.isResolvable === true && workflowHasIncompatibleTrigger()) {
+							foundIssues[credentialTypeDescription.name] = [
+								i18n.baseText('nodeIssues.credentials.privateRequiresManualTrigger'),
+							];
+						}
 						continue;
 					}
 				}
