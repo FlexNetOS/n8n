@@ -15,14 +15,20 @@ import { injectWorkflowDocumentStore } from '@/app/stores/workflowDocument.store
 import { NODE_CREATOR_SHORTCUT_COACHMARK_KEY } from '@/features/shared/nodeCreator/composables/useNodeCreatorShortcutCoachmark';
 import type { NodeCreatorOpenSource } from '@/Interface';
 import type {
+	AnyCanvasNode,
 	CanvasConnection,
 	CanvasEventBusEvents,
 	CanvasNode,
 	CanvasNodeData,
+	CanvasNodeGroupData,
 	CanvasNodeMoveEvent,
 	ConnectStartEvent,
 } from '../canvas.types';
-import { CanvasNodeRenderType } from '../canvas.types';
+import {
+	CANVAS_NODE_GROUP_ID_PREFIX,
+	CANVAS_NODE_GROUP_TYPE,
+	CanvasNodeRenderType,
+} from '../canvas.types';
 import { isOutsideSelected } from '@/app/utils/htmlUtils';
 import {
 	getMousePosition,
@@ -51,6 +57,7 @@ import type { CanvasRenderData } from '../canvas.utils';
 import { CanvasRenderDataKey } from '@/app/constants/injectionKeys';
 import {
 	computed,
+	inject,
 	nextTick,
 	onMounted,
 	onUnmounted,
@@ -59,6 +66,7 @@ import {
 	toRef,
 	useCssModule,
 	watch,
+	type Ref,
 } from 'vue';
 import { useViewportAutoAdjust } from '../composables/useViewportAutoAdjust';
 import CanvasBackground from './elements/background/CanvasBackground.vue';
@@ -67,9 +75,11 @@ import CanvasConnectionLine from './elements/edges/CanvasConnectionLine.vue';
 import CanvasControlButtons from './elements/buttons/CanvasControlButtons.vue';
 import Edge from './elements/edges/CanvasEdge.vue';
 import Node from './elements/nodes/CanvasNode.vue';
+import CanvasNodeGroupTitleBar from './elements/groups/CanvasNodeGroupTitleBar.vue';
 import CanvasSelectionToolbar from './elements/selection/CanvasSelectionToolbar.vue';
-import CanvasNodeGroupsLayer from './elements/groups/CanvasNodeGroupsLayer.vue';
 import { useCanvasNodeGroupActions } from '../composables/useCanvasNodeGroupActions';
+import { useCanvasNodeGroupDrag } from '../composables/useCanvasNodeGroupDrag';
+import { useCanvasNodeGroupView } from '../composables/useCanvasNodeGroupView';
 import { useExperimentalNdvStore } from '../experimental/experimentalNdv.store';
 import { type ContextMenuAction } from '@/features/shared/contextMenu/composables/useContextMenuItems';
 import { useFocusedNodesStore } from '@/features/ai/assistant/focusedNodes.store';
@@ -143,7 +153,7 @@ const emit = defineEmits<{
 const props = withDefaults(
 	defineProps<{
 		id?: string;
-		nodes: CanvasNode[];
+		nodes: AnyCanvasNode[];
 		connections: CanvasConnection[];
 		controlsPosition?: PanelPosition;
 		eventBus?: EventBus<CanvasEventBusEvents>;
@@ -233,7 +243,15 @@ const {
 const { layout } = useCanvasLayout(props.id, isExperimentalNdvActive, toRef(props, 'renderData'));
 
 const isPaneReady = ref(false);
-const nodeGroupIdToAutofocusTitle = ref<string | null>(null);
+// Shared from WorkflowCanvas via provide so useCanvasMapping (in WorkflowCanvas) and
+// Canvas.vue (action callbacks) see the same ref. Fallback ref is used when
+// Canvas.vue is mounted in isolation (e.g. older tests).
+const injectedAutofocusRef = inject<Ref<string | null> | null>('canvasNodeGroupAutofocus', null);
+const nodeGroupIdToAutofocusTitle = injectedAutofocusRef ?? ref<string | null>(null);
+const injectedNodeGroupView = inject<ReturnType<typeof useCanvasNodeGroupView> | null>(
+	'canvasNodeGroupView',
+	null,
+);
 
 const classes = computed(() => ({
 	[$style.canvas]: true,
@@ -467,11 +485,14 @@ const hasSelection = computed(() => selectedNodes.value.length > 0);
 const selectedNodeIds = computed(() => selectedNodes.value.map((node) => node.id));
 
 const lastSelectedNode = ref<GraphNode>();
-const triggerNodes = computed(() =>
-	props.nodes.filter(
-		(node) =>
-			node.data?.render.type === CanvasNodeRenderType.Default && node.data.render.options.trigger,
-	),
+const triggerNodes = computed<CanvasNode[]>(() =>
+	props.nodes.filter((node): node is CanvasNode => {
+		if (node.type === CANVAS_NODE_GROUP_TYPE) return false;
+		const data = node.data as CanvasNodeData | undefined;
+		return (
+			data?.render.type === CanvasNodeRenderType.Default && data.render.options.trigger === true
+		);
+	}),
 );
 
 const hoveredTriggerNode = useCanvasNodeHover(triggerNodes, vueFlow, (nodeRect) => ({
@@ -514,8 +535,41 @@ function onUpdateNodePosition(id: string, position: XYPosition) {
 	emit('update:node:position', id, position);
 }
 
+const groupDrag = useCanvasNodeGroupDrag({
+	canvasId: props.id,
+	getNodeById: (id) => workflowDocumentStore.value.getNodeById(id),
+	getGroupMembers: (groupVueFlowNodeId) => {
+		if (!groupVueFlowNodeId.startsWith(CANVAS_NODE_GROUP_ID_PREFIX)) return [];
+		const groupId = groupVueFlowNodeId.slice(CANVAS_NODE_GROUP_ID_PREFIX.length);
+		return workflowDocumentStore.value.getGroupById(groupId)?.nodeIds ?? [];
+	},
+	onMoveMembers: (moves) => emit('update:nodes:position', moves),
+});
+
+function onNodeDragStart(event: NodeDragEvent) {
+	groupDrag.onNodeDragStart(event);
+}
+
+function onNodeDrag(event: NodeDragEvent) {
+	groupDrag.onNodeDrag(event);
+}
+
 function onNodeDragStop(event: NodeDragEvent) {
+	const handledByGroup = groupDrag.onNodeDragStop(event);
+	if (handledByGroup) return;
 	onUpdateNodesPosition(event.nodes.map(({ id, position }) => ({ id, position })));
+}
+
+function onCanvasGroupToggle(groupId: string) {
+	injectedNodeGroupView?.toggleCollapsed(groupId);
+}
+
+function onCanvasGroupNameUpdate(groupId: string, name: string) {
+	workflowDocumentStore.value.updateName(groupId, name);
+}
+
+function onCanvasGroupUngroup(groupId: string) {
+	workflowDocumentStore.value.deleteGroup(groupId);
 }
 
 function onNodeClick({ event, node }: NodeMouseEvent) {
@@ -826,11 +880,26 @@ function onViewportChange() {
 
 // #AI-716: Due to a bug in vue-flow reactivity, the node data is not updated when the node is added
 // resulting in outdated data. We use this computed property as a workaround to get the latest node data.
+// Split per node type so each slot template gets a precisely-typed lookup
+// (no `as unknown as` casts at the call site).
 const nodeDataById = computed(() => {
-	return props.nodes.reduce<Record<string, CanvasNodeData>>((acc, node) => {
-		acc[node.id] = node.data as CanvasNodeData;
-		return acc;
-	}, {});
+	const byId: Record<string, CanvasNodeData> = {};
+	for (const node of props.nodes) {
+		if (node.type !== CANVAS_NODE_GROUP_TYPE && node.data) {
+			byId[node.id] = node.data as CanvasNodeData;
+		}
+	}
+	return byId;
+});
+
+const groupNodeDataById = computed(() => {
+	const byId: Record<string, CanvasNodeGroupData> = {};
+	for (const node of props.nodes) {
+		if (node.type === CANVAS_NODE_GROUP_TYPE && node.data) {
+			byId[node.id] = node.data as CanvasNodeGroupData;
+		}
+	}
+	return byId;
 });
 
 /**
@@ -1172,6 +1241,8 @@ defineExpose({
 		@pane-context-menu="onOpenContextMenu"
 		@move="onPaneMove"
 		@move-end="onPaneMoveEnd"
+		@node-drag-start="onNodeDragStart"
+		@node-drag="onNodeDrag"
 		@node-drag-stop="onNodeDragStop"
 		@node-click="onNodeClick"
 		@selection-drag-stop="onSelectionDragStop"
@@ -1181,6 +1252,18 @@ defineExpose({
 		@drop="onDrop"
 		@viewport-change="onViewportChange"
 	>
+		<template #node-canvas-node-group="nodeProps">
+			<CanvasNodeGroupTitleBar
+				v-bind="nodeProps"
+				:data="groupNodeDataById[nodeProps.id]"
+				:read-only="readOnly"
+				@toggle="onCanvasGroupToggle"
+				@update:name="onCanvasGroupNameUpdate"
+				@title:focused="onNodeGroupTitleFocused"
+				@ungroup="onCanvasGroupUngroup"
+			/>
+		</template>
+
 		<template #node-canvas-node="nodeProps">
 			<slot name="node" v-bind="{ nodeProps }">
 				<Node
@@ -1239,14 +1322,6 @@ defineExpose({
 		<slot name="canvas-background" v-bind="{ viewport }">
 			<CanvasBackground :viewport="viewport" :striped="readOnly" />
 		</slot>
-
-		<CanvasNodeGroupsLayer
-			v-if="showNodeGroups && isCanvasNodeGroupingEnabled"
-			:read-only="readOnly || suppressInteraction"
-			:autofocus-group-id="nodeGroupIdToAutofocusTitle"
-			@title:focused="onNodeGroupTitleFocused"
-			@move-members="onUpdateNodesPosition"
-		/>
 
 		<CanvasSelectionToolbar
 			v-if="showNodeGroups && isCanvasNodeGroupingEnabled"

@@ -224,6 +224,7 @@ function onActivate(event: MouseEvent) {
 </template>
 
 <style lang="scss" module>
+@use './_canvasNodeExecutionStatus.scss' as exec;
 .node {
 	--canvas-node--border-width: 1.5px;
 	--trigger-node--radius: 36px;
@@ -336,11 +337,7 @@ function onActivate(event: MouseEvent) {
 	}
 
 	&.success {
-		--canvas-node--border-width: 2px;
-		--canvas-node--border-color: var(
-			--color-canvas-node-success-border-color,
-			var(--color--success)
-		);
+		@include exec.status-success;
 	}
 
 	&.warning {
@@ -349,7 +346,7 @@ function onActivate(event: MouseEvent) {
 	}
 
 	&.error {
-		--canvas-node--border-color: var(--canvas-node--border-color--error, var(--color--danger));
+		@include exec.status-error;
 	}
 
 	&.pinned {
@@ -368,15 +365,11 @@ function onActivate(event: MouseEvent) {
 	}
 
 	&.running {
-		border-color: transparent;
-		--canvas-node--border-color: var(
-			--color-canvas-node-running-border-color,
-			var(--node--border-color--running)
-		);
+		@include exec.status-running-border;
 	}
 
 	&.waiting {
-		--canvas-node--border-color: transparent;
+		@include exec.status-waiting-border;
 	}
 
 	&.placeholder {
@@ -395,27 +388,14 @@ function onActivate(event: MouseEvent) {
 /* stylelint-disable */
 .running::after,
 .waiting::after {
-	content: '';
-	position: absolute;
-	inset: -3px;
-	border-radius: 10px;
-	z-index: -1;
-	background: conic-gradient(
-		from var(--node--gradient-angle),
-		rgba(255, 109, 90, 1),
-		rgba(255, 109, 90, 1) 20%,
-		rgba(255, 109, 90, 0.2) 35%,
-		rgba(255, 109, 90, 0.2) 65%,
-		rgba(255, 109, 90, 1) 90%,
-		rgba(255, 109, 90, 1)
-	);
+	@include exec.status-animated-after;
 }
 
 .running::after {
-	animation: border-rotate 1.5s linear infinite;
+	@include exec.status-running-animation;
 }
 .waiting::after {
-	animation: border-rotate 4.5s linear infinite;
+	@include exec.status-waiting-animation;
 }
 
 @property --node--gradient-angle {
