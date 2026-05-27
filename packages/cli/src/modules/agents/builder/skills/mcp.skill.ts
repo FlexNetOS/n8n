@@ -53,26 +53,6 @@ If \`search_mcp_servers\` returns no matches and the user provides a custom
 server URL, skip the search result mapping and continue with manual
 transport/authentication plus credential selection.
 
-### mcpServers[] entry shape
-
-Each \`mcpServers[]\` entry supports:
-
-- \`name\` (required, unique within \`mcpServers\`, 1-64 chars, /^[A-Za-z0-9_-]+$/)
-- \`url\` (required)
-- \`transport\`: \`"sse"\` | \`"streamableHttp"\` (default \`"streamableHttp"\`)
-- \`authentication\`: \`"none"\` | \`"bearerAuth"\` | \`"headerAuth"\` |
-  \`"multipleHeadersAuth"\` | \`"mcpOAuth2Api"\` |
-  string ending in \`"McpOAuth2Api"\` (default \`"none"\`)
-- \`credential\`: required when authentication !== \`"none"\` (must be the id
-  returned by \`ask_credential\`)
-- \`toolFilter\` (optional): \`{ mode: "allow" | "exclude", tools: string[] }\`,
-  matched against original (un-prefixed) tool names
-- \`approval\` (optional): \`{ mode: "global" }\` for all tools, or
-  \`{ mode: "selected", tools: [...] }\` for specific tools (must be non-empty)
-- \`connectionTimeoutMs\` (optional): 1-120000
-- \`metadata\` (optional): optional server-generated metadata. Do not use this
-  field unless explicitly instructed to do so by instructions
-
 Full schema reference:
 
 ${mcpServerSchemaText}
