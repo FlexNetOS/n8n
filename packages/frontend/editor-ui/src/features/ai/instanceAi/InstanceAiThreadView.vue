@@ -29,8 +29,6 @@ import { COLLAPSED_MAIN_SIDEBAR_WIDTH, useSidebarLayout } from '@/app/composable
 import { provideThread, useInstanceAiStore } from './instanceAi.store';
 import { isPendingItemFloating } from './confirmationKinds';
 import { useCanvasPreview } from './useCanvasPreview';
-import { useEventRelay } from './useEventRelay';
-import { useExecutionPushEvents } from './useExecutionPushEvents';
 import { useCreditWarningBanner } from './composables/useCreditWarningBanner';
 import { useTransitionGate } from './useTransitionGate';
 import { INSTANCE_AI_VIEW, NEW_CONVERSATION_TITLE } from './constants';
@@ -80,10 +78,7 @@ const hasFloatingConfirmation = computed(() =>
 	thread.pendingConfirmations.some(isPendingItemFloating),
 );
 
-// --- Execution tracking via push events (drives canvas relay) ---
-const executionTracking = useExecutionPushEvents();
-
-// --- Fix-with-AI offer (failure data sent by the iframe via postMessage) ---
+// --- Fix-with-AI offer (failure data emitted by the artifact host) ---
 const failedRun = ref<WorkflowFailuresReport | null>(null);
 const dismissedExecutionId = ref<string | null>(null);
 
@@ -521,20 +516,10 @@ onUnmounted(() => {
 	contentResizeObserver?.disconnect();
 	inputContainerResizeObserver?.disconnect();
 	inputSwapResizeObserver?.disconnect();
-	executionTracking.cleanup();
 });
 
-// --- Workflow preview ref for iframe relay ---
 const workflowPreviewRef =
 	useTemplateRef<InstanceType<typeof InstanceAiWorkflowPreview>>('workflowPreview');
-
-const eventRelay = useEventRelay({
-	workflowExecutions: executionTracking.workflowExecutions,
-	activeWorkflowId: preview.activeWorkflowId,
-	getBufferedEvents: executionTracking.getBufferedEvents,
-	clearEventLog: executionTracking.clearEventLog,
-	relay: (event) => workflowPreviewRef.value?.relayPushEvent(event),
-});
 
 // --- Message handlers ---
 function handleSubmit(message: string, attachments?: InstanceAiAttachment[]) {
@@ -814,8 +799,6 @@ function handleWorkflowFailures(report: WorkflowFailuresReport) {
 							@toggle-preview="toggleArtifactsPreview"
 							@toggle-expanded="togglePreviewExpanded"
 						/>
-						<!-- Hoisted above the tab v-for so the iframe survives tab switches; tabs swap
-	     workflows via openWorkflow postMessage instead of remounting. -->
 						<div :class="$style.previewContent">
 							<div
 								v-if="preview.activeSetupWorkflowId.value"
@@ -838,6 +821,8 @@ function handleWorkflowFailures(report: WorkflowFailuresReport) {
 								</N8nText>
 							</div>
 							<InstanceAiWorkflowPreview
+								v-if="preview.activeWorkflowId.value"
+								:key="preview.activeWorkflowId.value"
 								ref="workflowPreview"
 								:class="[
 									$style.previewSlot,
@@ -848,8 +833,6 @@ function handleWorkflowFailures(report: WorkflowFailuresReport) {
 								]"
 								:workflow-id="preview.activeWorkflowId.value"
 								:refresh-key="preview.workflowRefreshKey.value"
-								@iframe-ready="eventRelay.handleIframeReady"
-								@workflow-loaded="eventRelay.handleWorkflowLoaded"
 								@workflow-failures="handleWorkflowFailures"
 							/>
 							<InstanceAiDataTablePreview
