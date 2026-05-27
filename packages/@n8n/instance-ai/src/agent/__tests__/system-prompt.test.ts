@@ -270,22 +270,23 @@ describe('getSystemPrompt', () => {
 			expect(prompt).not.toContain('Always run your own verification');
 		});
 
-		it('does not mark setup-deferred checkpoint workflows as verified', () => {
+		it('keeps setup after successful mock verification', () => {
 			const prompt = getSystemPrompt({});
 
 			expect(prompt).toContain('workflows(action="setup")');
 			expect(prompt).toContain('outcome.setupRequirement');
 			expect(prompt).toContain('build lifecycle reference');
-			expect(prompt).toContain('If setup is required before verification');
-			expect(prompt).toContain('verification has not run');
+			expect(prompt).toContain('verify/test with available mock or real data');
+			expect(prompt).toContain('setup is deferred after verification passes');
+			expect(prompt).toContain('verifiedWithMocks: true');
 			expect(prompt).toContain('setupDeferred: true');
 		});
 
 		it('tells the orchestrator it may patch directly during a checkpoint', () => {
 			const prompt = getSystemPrompt({});
 
-			expect(prompt).toContain('If the skill lifecycle patches the workflow in place');
-			expect(prompt).toContain('re-run verification before completing the checkpoint');
+			expect(prompt).toContain('patch and re-verify fixable errors');
+			expect(prompt).toContain('remediation guard stops edits');
 			expect(prompt).toContain('complete-checkpoint');
 		});
 

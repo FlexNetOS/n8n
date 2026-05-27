@@ -5,6 +5,7 @@ const KNOWN_MOCKABLE_TRIGGER_TYPES = new Set([
 	'n8n-nodes-base.formTrigger',
 	'n8n-nodes-base.scheduleTrigger',
 	'@n8n/n8n-nodes-langchain.chatTrigger',
+	'n8n-nodes-base.slackTrigger',
 ]);
 
 const KNOWN_WEBHOOK_ID_TRIGGER_TYPES = new Set([

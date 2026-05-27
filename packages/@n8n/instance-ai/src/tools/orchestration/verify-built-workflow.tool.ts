@@ -403,16 +403,6 @@ function classifyVerificationFailure(
 	status: string | undefined,
 	buildOutcome: WorkflowBuildOutcome,
 ): RemediationMetadata {
-	if (buildOutcome.hasUnresolvedPlaceholders) {
-		return createRemediation({
-			category: 'needs_setup',
-			shouldEdit: false,
-			reason: 'mocked_credentials_or_placeholders',
-			guidance:
-				'Workflow submitted successfully, but verification is blocked by unresolved setup values. Stop code edits and route to workflows(action="setup").',
-		});
-	}
-
 	if (status === 'waiting') {
 		return createRemediation({
 			category: 'needs_setup',
@@ -427,6 +417,8 @@ function classifyVerificationFailure(
 	const mockedCredentialTypeCount = buildOutcome.mockedCredentialTypes?.length ?? 0;
 	const mockedNodeCount = buildOutcome.mockedNodeNames?.length ?? 0;
 	const hasMockedCredentialContext = Boolean(mockedCredentialTypeCount > 0 || mockedNodeCount > 0);
+	const hasUnresolvedSetupContext = buildOutcome.hasUnresolvedPlaceholders === true;
+	const hasSetupContext = hasMockedCredentialContext || hasUnresolvedSetupContext;
 	if (
 		normalized.includes('credential') ||
 		normalized.includes('unauthorized') ||
@@ -434,16 +426,20 @@ function classifyVerificationFailure(
 		normalized.includes('401') ||
 		normalized.includes('403') ||
 		normalized.includes('free tier') ||
-		normalized.includes('quota')
+		normalized.includes('quota') ||
+		(hasUnresolvedSetupContext &&
+			(normalized.includes('placeholder') ||
+				normalized.includes('required parameter') ||
+				(normalized.includes('parameter') && normalized.includes('required'))))
 	) {
 		return createRemediation({
 			category: 'needs_setup',
 			shouldEdit: false,
-			reason: hasMockedCredentialContext
+			reason: hasSetupContext
 				? 'mocked_credentials_or_placeholders'
 				: 'credential_or_setup_failure',
-			guidance: hasMockedCredentialContext
-				? 'Workflow submitted successfully, but verification is blocked by mocked credentials. Stop code edits and route to workflows(action="setup").'
+			guidance: hasSetupContext
+				? 'Workflow submitted successfully, but verification is blocked by real credentials or setup values. Stop code edits and route to workflows(action="setup").'
 				: 'Workflow submitted successfully, but verification requires credential or account setup. Stop code edits and route to workflows(action="setup").',
 		});
 	}

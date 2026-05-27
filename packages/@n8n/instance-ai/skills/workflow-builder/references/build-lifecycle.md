@@ -1,9 +1,9 @@
 # Build Lifecycle
 
-The canonical workflow-building lifecycle is: save the workflow, verify it with
-structured evidence, patch and re-verify if needed, then route setup only after
-verification succeeds. Route setup before verification only when the build
-outcome explicitly says setup is required before verification can run.
+The canonical workflow-building lifecycle is: save the workflow, verify/test it
+with the data available, patch and re-verify fixable errors until verified or
+blocked by the repair guard, then route setup after verification when real
+credentials or setup values are still needed.
 
 ## Save
 
@@ -59,16 +59,25 @@ expression is wrong against the production trigger output shape.
 
 - If verification exposes a workflow bug that can be patched narrowly, call
   `workflows(action="update")`, then verify again.
-- Keep patch attempts bounded. If the issue cannot be narrowed within two
-  rounds, report the concrete blocker.
+- If `verify-built-workflow` returns `remediation.shouldEdit === true`, make one
+  batched workflow-code repair, save it, then verify again. Respect
+  `remainingSubmitFixes`, `attemptCount`, repeated failure signatures, and any
+  terminal remediation from the tool; do not keep editing after the guard says to
+  stop.
+- If verification returns `remediation.shouldEdit === false`, do not edit. Follow
+  the remediation guidance: setup for `needs_setup`, or report the blocker for
+  `blocked`.
 - If the verified workflow still has mocked credentials or placeholders, call
   `workflows(action="setup")`.
 - When `workflows(action="setup")` opens the inline setup card, that card is the
   user-visible surface. Do not tell the user to open the editor, use the canvas,
   or click a Setup button.
 - If setup returns `deferred: true`, respect the user's decision and do not
-  retry with `credentials(action="setup")` or other setup tools. If setup was
-  required before verification, do not mark verification as succeeded.
+  retry with `credentials(action="setup")` or other setup tools. If verification
+  already passed, complete the checkpoint as succeeded with an outcome such as
+  `{ workflowId, verifiedWithMocks: true, setupDeferred: true, needsSetup: true }`.
+  If setup was required before verification could run, do not mark verification
+  as succeeded.
 
 ## Publish
 

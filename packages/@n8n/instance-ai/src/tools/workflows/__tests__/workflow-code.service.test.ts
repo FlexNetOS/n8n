@@ -277,7 +277,55 @@ describe('workflow code create/update approval flow', () => {
 			workflowId: 'created-wf',
 			triggerNodes: [{ nodeName: 'Webhook', nodeType: 'n8n-nodes-base.webhook' }],
 			hasUnresolvedPlaceholders: true,
-			verificationReadiness: { status: 'needs_setup', reason: 'unresolved-placeholders' },
+			verificationReadiness: { status: 'ready' },
+			setupRequirement: { status: 'required', reason: 'unresolved-placeholders' },
+		});
+	});
+
+	it('keeps mocked credential workflows verifiable before setup when pin data is available', async () => {
+		mockedParseAndValidate.mockReturnValueOnce({
+			workflow: {
+				name: 'Slack intake',
+				nodes: [
+					{
+						id: 'slack',
+						name: 'Slack Trigger',
+						type: 'n8n-nodes-base.slackTrigger',
+						typeVersion: 1,
+						position: [0, 0],
+						parameters: {
+							trigger: ['message'],
+							channelId: '<__PLACEHOLDER_VALUE__Select Slack channel__>',
+						},
+						credentials: {
+							slackApi: undefined as unknown as { id: string; name: string },
+						},
+					},
+				],
+				connections: {},
+			},
+			warnings: [],
+		});
+		const ctx = makeContext({ createWorkflow: 'always_allow' });
+		const service = createWorkflowCodeService(ctx);
+		const { context } = makeToolContext();
+
+		const result = await service.create(
+			{ action: 'create', code: validCode, name: 'Slack intake' },
+			context,
+		);
+
+		expect(result).toMatchObject({
+			success: true,
+			workflowId: 'created-wf',
+			triggerNodes: [{ nodeName: 'Slack Trigger', nodeType: 'n8n-nodes-base.slackTrigger' }],
+			mockedNodeNames: ['Slack Trigger'],
+			mockedCredentialTypes: ['slackApi'],
+			verificationPinData: {
+				'Slack Trigger': [{ _mockedCredential: 'slackApi' }],
+			},
+			hasUnresolvedPlaceholders: true,
+			verificationReadiness: { status: 'ready' },
 			setupRequirement: { status: 'required', reason: 'unresolved-placeholders' },
 		});
 	});

@@ -371,14 +371,6 @@ function determineDirectVerificationReadiness(
 		};
 	}
 
-	if (outcome.hasUnresolvedPlaceholders) {
-		return {
-			status: 'needs_setup',
-			reason: 'unresolved-placeholders',
-			guidance: 'Route the workflow through setup before verification.',
-		};
-	}
-
 	if (hasMockedCredentials(outcome) && !hasCredentialVerificationData(outcome)) {
 		return {
 			status: 'needs_setup',
