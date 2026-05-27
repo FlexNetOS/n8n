@@ -2232,7 +2232,7 @@ export class InstanceAiService {
 		threadId: string,
 		userId: string,
 		message: { id: string; text: string },
-	): Promise<void> {
+	): Promise<boolean> {
 		try {
 			await this.agentMemory.saveMessages({
 				threadId,
@@ -2246,12 +2246,14 @@ export class InstanceAiService {
 					},
 				],
 			});
+			return true;
 		} catch (error: unknown) {
 			this.logger.warn('Failed to persist user message on HITL suspend', {
 				threadId,
 				userId,
 				error: getErrorMessage(error),
 			});
+			return false;
 		}
 	}
 
@@ -2972,9 +2974,16 @@ export class InstanceAiService {
 				// HITL never reaches that point. Doing this *now* (rather than
 				// at executeRun start) avoids polluting the agent's prompt —
 				// the SDK has already loaded its memory snapshot for this run.
+				// Flip the saved flag only on confirmed success so a transient
+				// DB error doesn't lock out the next HITL's retry. SDK
+				// `saveMessages` is id-keyed, so a concurrent race upserts the
+				// same row rather than producing a duplicate.
 				if (!userMessageSaved && userMessagePersistence) {
-					userMessageSaved = true;
-					void this.persistUserMessageOnSuspend(threadId, user.id, userMessagePersistence);
+					void this.persistUserMessageOnSuspend(threadId, user.id, userMessagePersistence).then(
+						(ok) => {
+							if (ok) userMessageSaved = true;
+						},
+					);
 				}
 
 				return await new Promise<ConfirmationData>((resolve) => {
@@ -3019,8 +3028,12 @@ export class InstanceAiService {
 				),
 			persistInFlightUserMessage: async () => {
 				if (userMessageSaved || !userMessagePersistence) return;
-				userMessageSaved = true;
-				await this.persistUserMessageOnSuspend(threadId, user.id, userMessagePersistence);
+				const ok = await this.persistUserMessageOnSuspend(
+					threadId,
+					user.id,
+					userMessagePersistence,
+				);
+				if (ok) userMessageSaved = true;
 			},
 			workflowTaskService: workflowTasks,
 			workspace: runtimeWorkspace,
