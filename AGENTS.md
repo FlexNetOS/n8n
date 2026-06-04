@@ -27,6 +27,25 @@ are namespaced under `n8n:`. Use `n8n:` prefix when invoking them
 (e.g. `/n8n:create-pr`, `/n8n:plan`, `n8n:developer` agent).
 See [plugin README](.claude/plugins/n8n/README.md) for structure and details.
 
+## Harness: n8n Runtime
+
+**Goal:** Boot, monitor, and operate a local n8n instance — shell routed through
+**rtk**, status + API-key handoff coordinated over the **meta weave** mesh, and
+workflow build/validate/deploy via the **n8n-mcp** MCP server.
+
+**Trigger:** For any task about *running* n8n (start/boot/launch/restart/stop a
+local instance, check its health, report status to the mesh, or build/deploy a
+workflow on it), use the `n8n:run-n8n` skill. It orchestrates the
+`runtime-operator`, `runtime-monitor`, and `workflow-engineer` agents over the
+weave mesh. Simple questions may be answered directly. For editing n8n's own
+source, use the `n8n:developer` agent instead — this harness *runs* the engine,
+it does not modify it.
+
+**Change history:**
+| Date | Change | Target | Reason |
+|------|--------|--------|--------|
+| 2026-06-04 | Initial setup | agents/{runtime-operator,runtime-monitor,workflow-engineer}, skills/{run-n8n,runtime,mesh-report,workflow-ops}, `.mcp.json` (n8n-mcp) | Build harness to run n8n via weave + rtk; add n8n-mcp |
+
 ## Essential Commands
 
 ### Fresh checkout / agent setup

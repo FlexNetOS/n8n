@@ -1,0 +1,15 @@
+{
+  "_comment": "Canonical wiring from meta/mcp_hub (snippets/n8n-mcp.mcp.json). Docs-only mode: the 7 core tools (node docs, search, validation, templates) work with no credentials. N8N_API_URL is pre-pointed at the local dev instance; add N8N_API_KEY to unlock the 13 management tools. Per the run-n8n harness, the key is obtained from the n8n UI on first launch and cataloged through weave — do NOT commit a key here (public repo).",
+  "mcpServers": {
+    "n8n-mcp": {
+      "command": "npx",
+      "args": ["n8n-mcp"],
+      "env": {
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "error",
+        "DISABLE_CONSOLE_OUTPUT": "true",
+        "N8N_API_URL": "http://localhost:5678"
+      }
+    }
+  }
+}
