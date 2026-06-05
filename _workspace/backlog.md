@@ -66,8 +66,16 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs` (recorded as a B-3 gate in the spec §7).
         Carved wf JSON out of `.gitignore`. Not deployed (SAFE). Verify: validate valid · JSON parses ·
         tracked-eligible.
-- [ ] B-3: **(APPLY)** Deploy the bridge to the local n8n and smoke a chat round-trip
+- [!] B-3: **(APPLY)** Deploy the bridge to the local n8n and smoke a chat round-trip
       (chat in → claude responds) via the n8n MCP server.
+      - 2026-06-05 blocked (SAFE refusal of outward/irreversible action). Three unmet gates, all
+        requiring a human/operator decision: (1) **APPLY mode** — currently `apply_mode=0`; run with
+        `N8N_APPLY=1` to permit deploy. (2) **Instance env** `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,
+        path,fs` — the bridge's secure `execFile` Code node is sandboxed without it (spec §7); plus
+        `claude` on the n8n process PATH + `ANTHROPIC_API_KEY`. (3) **Running n8n** on the container
+        profile with both MCP surfaces (down at this handoff; boot via `n8n:run-n8n`). Validated
+        artifact is ready (`_workspace/wf/claude-n8n-chat-bridge.json`, B-2); only the outward deploy
+        is deferred. Surfaced for a human in the HANDOFF/DONE summary.
 
 ## Epic C — add all code to n8n to visualize data flow & automations
 - [ ] C-1: Define the code→n8n visualization mapping (repo/module → nodes; data edges → connections;
