@@ -103,4 +103,8 @@ stryker.log
 # (dir-level ignore blocks re-inclusion, so un-ignore the dir then its contents.)
 !/_workspace/wf/
 !/_workspace/wf/*.json
+# Epic C visualization deliverables — mapping (C-1) + validated viz workflows (C-2).
+!/_workspace/viz/
+!/_workspace/viz/MAPPING.md
+!/_workspace/viz/*.json
 packages/@n8n/task-runner-python/task_runner_python.egg-info/

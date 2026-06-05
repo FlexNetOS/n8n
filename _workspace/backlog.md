@@ -78,8 +78,15 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         is deferred. Surfaced for a human in the HANDOFF/DONE summary.
 
 ## Epic C — add all code to n8n to visualize data flow & automations
-- [ ] C-1: Define the code→n8n visualization mapping (repo/module → nodes; data edges → connections;
+- [x] C-1: Define the code→n8n visualization mapping (repo/module → nodes; data edges → connections;
       use NoOp + Sticky Note nodes for pure diagram workflows) → `_workspace/viz/MAPPING.md`.
+      - 2026-06-05: wrote `_workspace/viz/MAPPING.md` — deterministic rules: repo/component →
+        `n8n-nodes-base.noOp` (inert, `notes`=lang/symbols/role); A-4 edge → `main` connection; layer/
+        subgraph → `n8n-nodes-base.stickyNote` (color-coded 1–7) + grid layout. C-2 scope bounded to 3
+        master diagrams (build-spine / runtime-dataflow / n8n-execution), per-repo explicitly out of
+        scope (no silent truncation). Node facts grounded via n8n-mcp. Verify: `git diff --check` clean
+        · embedded example workflow `validate_workflow` = **valid, 0 errors** (only expected no-trigger
+        warning) · tracked-eligible.
 - [ ] C-2: Generate one validated n8n visualization workflow per meta repo (or a master) from the A-4
       data-flow map via `n8n:workflow-ops` → `_workspace/viz/*.json` (validated, not deployed).
 - [ ] C-3: **(APPLY)** Deploy the visualization workflows to the local n8n; verify each renders and
