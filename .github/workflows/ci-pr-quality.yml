@@ -9,6 +9,7 @@ on:
       - synchronize
     branches:
       - master
+      - develop
   issue_comment:
     types:
       - created
