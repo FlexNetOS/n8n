@@ -1,127 +1,68 @@
-# n8n-loop HANDOFF — 2026-06-05T07:29:53Z
+# n8n-loop HANDOFF — 2026-06-05T19:40:56Z (post-APPLY, Epic D open)
 
-> Cold-start resume package. A successor that has read **only** this file + the committed
-> `_workspace/backlog.md` can finish the loop correctly. Latest-truth, not a log.
->
-> **THIS IS THE TERMINAL HANDOFF.** Exactly **one** backlog item remains (C-3), it is **(APPLY)**,
-> and in SAFE mode it BLOCKS rather than deploys. The successor's entire remaining job is:
-> block C-3 → write `_workspace/DONE` → commit → STOP. Do NOT deploy. Do NOT start new epics.
+Cold-start resume package. A successor that has read **only** this file + the committed
+`_workspace/backlog.md` can continue with zero prior context.
 
 ## Resume command
 ```
-/n8n-loop resume from _workspace/HANDOFF.md (branch master) — block C-3 (APPLY) in SAFE, then write
-_workspace/DONE; the loop terminates
+/n8n-loop resume from _workspace/HANDOFF.md (branch develop) — read the committed handoff, run the
+Verify-on-resume baseline, then continue at the backlog's next item (Epic D). SAFE unless N8N_APPLY=1.
 ```
-On RESUME: reset `cycles_this_session=0`, **keep `cycles_total=10`**, keep `apply_mode=0` (SAFE).
 
-## Repo & branch
-- Path: `~/Desktop/meta/n8n` @ `master`
-- HEAD: `517b02ae6b`
-- `git status`: clean **except** one untracked transient `.claude/scheduled_tasks.lock`
-  (cron-scheduler lock — NOT loop state; ignore it, do not commit it).
-- This is a **meta-repo member** (the n8n repo is its own git repo). Use plain `git` here, not `meta git`.
+## Repo, branch & policy  ⚠️ READ THIS
+- Path: `~/Desktop/meta/n8n`. Remote `FlexNetOS/n8n`.
+- **BRANCHING (hard rule, see memory `n8n-branching-workflow`):** `master` = production, **NO direct
+  pushes** (the auto-mode classifier denies `git push` to master — that's DESIRED; do NOT add an
+  allow rule). All dev work = a **feature branch off `develop`** → `gh pr create --base develop` →
+  **auto-merge on green**. `develop` (= `origin/develop`) is the integration line.
+- A feature branch **`harness/apply-deploy-persist`** carries this session's work (Epic D-0 + scripts
+  + ledger); it has an open PR `--base develop` set to auto-merge. If that PR already merged, branch
+  off the new `origin/develop`; if not, you may add to it.
 
-## Backlog (epics — current item starred ★)
-Source of truth = `_workspace/backlog.md`. Mirror exactly. **Only C-3 is `- [ ]`.**
+## What this (APPLY) session did — all live + committed
+- **Epics A/B/C were already complete.** The user authorized `N8N_APPLY=1`; this session deployed the
+  outward items to the LOCAL n8n (http://localhost:5678) via the **n8n-builtin** MCP surface (n8n-mcp
+  mgmt is SSRF-blocked on localhost):
+  - **C-3** ✅ 3 viz workflows live (inactive): `ghqgmnJnB8zMMmAN`, `baU04FGqVHA0pntk`, `7z11ihYBJ7soxaik`.
+  - **B-3** ✅ chat bridge `ggvV5wItgjsRnwFk` live + smoked: full round-trip green (claude answered
+    "Paris is the capital of France."); guard still blocks attacks (denylisted → Refuse, claude never
+    invoked). Runtime needs `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs`; the bridge reads
+    env via n8n `$env` (no `process` global in the Code sandbox) and injects ONLY
+    `~/.claude/.credentials.json` into its sandbox HOME (user-approved auth trade-off). Left INACTIVE.
+  - **D-0** ✅ persisted all 4 workflows into `~/.n8n` (`n8n import:workflow`), so a dockerized n8n that
+    mounts `~/.n8n` boots with them. Reproducible: `scripts/n8n-import-workflows.sh`. Verify with
+    `( cd packages/cli/bin && ./n8n list:workflow )` → expect ≥6 incl. the 4 ids above.
 
-- **Epic 0 — harness self-test:** ✅ 0-1 done.
-- **Epic A — map the meta codebase:** ✅ **COMPLETE** (A-1, A-2, A-3, A-4 all `[x]`).
-  - A-1 → `_workspace/meta-inventory.md` (51 repos) · A-2 → indexed all 51, symbol table appended
-  - A-3 → `_workspace/meta-codemap.md` (automation surfaces) · A-4 → `_workspace/meta-dataflow.md` (3 mermaid views)
-- **Epic B — Claude CLI ↔ n8n chat bridge:**
-  - B-1 ✅ → `.claude/specs/claude-n8n-chat-bridge.md` (guardrails-first spec; threats T1–T6 → gates G1–G7)
-  - B-2 ✅ → `_workspace/wf/claude-n8n-chat-bridge.json` (5 nodes, validate_workflow = valid/0 errors; NOT deployed)
-  - B-3 **(APPLY)** `- [!] blocked` → deploy bridge + smoke chat round-trip. Blocked in SAFE (see Open findings).
-- **Epic C — visualize code/data-flow in n8n:**
-  - C-1 ✅ → `_workspace/viz/MAPPING.md` (deterministic code→n8n viz rules; noOp + stickyNote)
-  - C-2 ✅ → `_workspace/viz/0{1,2,3}-*.json` (3 master viz workflows, all validate valid/0 errors; NOT deployed)
-  - ★ **C-3 (APPLY)** `- [ ]` → deploy viz workflows + verify each renders. **LAST item — will block in SAFE.**
+## Next items — Epic D (productionization)
+- **D-1 (APPLY, needs docker)** — bring up dockerized n8n on :5678 mounting `~/.n8n`:
+  `pnpm build:docker` (if `n8nio/n8n:local` absent) → `scripts/n8n-up.sh`; verify `/healthz` 200 + the
+  4 workflows render. **The in-IDE agent CANNOT do this** (docker.sock permission denied). The
+  `ralph-n8n.sh` runner (a `claude -p` in the user's docker-enabled shell) CAN. If your session lacks
+  docker, mark D-1 `- [!] blocked: needs docker-enabled shell` and continue.
+- **D-2** triage Dependabot **PR #1** (`uv` bump) — merge if green / close with reason.
+- **D-3** add CI to `validate_workflow` the committed `_workspace/{wf,viz}/*.json` (SAFE).
+- **D-4** bridge-activation policy decision (keep inactive vs enable behind auth) — document, don't auto-enable.
 
-After C-3 is marked blocked, **no `- [ ]` remains** → the loop's DONE condition is satisfied.
+## Ledger (`_workspace/loop_state.md`)
+- `cycles_this_session=4`, `cycles_total=15`, `cycle_budget=3`, `apply_mode=1`.
+- **RESUME-reset:** set `cycles_this_session=0`, keep `cycles_total=15`. (Budget is per-session; this
+  session exceeded it during the APPLY push at the user's direction — the successor resets.)
 
-## Cycle ledger (`_workspace/loop_state.md`)
-- cycles_this_session = **3** (budget tripped the handoff) · cycle_budget = 3
-- cycles_total = **10** · apply_mode = **0 (SAFE)**
-- This session was a RESUME (from prior HANDOFF `06baa94b39`). Cycles this session: cy1=B-3(blocked), cy2=C-1, cy3=C-2.
-
-## In-flight cycle
-**None — clean boundary.** Cycle 3 (C-2) completed, verified, and committed. No partial artifacts; tree is clean.
-
-## Landed this session (commit hashes + subjects)
-- `517b02ae6b` docs(harness): n8n-loop C-2 — generate + validate 3 master viz workflows
-- `22b5f6fd87` docs(harness): n8n-loop C-1 — code→n8n visualization mapping
-- `dda9780acc` chore(harness): n8n-loop B-3 blocked — APPLY deploy deferred in SAFE
-- (`06baa94b39` was the *prior* session's handoff checkpoint — landed before this session.)
-- A relay commit (this HANDOFF) will land on top after this agent returns — do not re-do it.
-
-## ★ NEXT ITEM — C-3, the LAST item (block it, then finish the loop)
-The only unchecked item is **C-3**, and it is **(APPLY)**: "deploy the visualization workflows to the
-local n8n; verify each renders." In SAFE mode the loop must NOT deploy. Unmet gates (same shape as B-3,
-minus the bridge-specific env): **APPLY mode** (`N8N_APPLY=1`; currently `apply_mode=0`) + a **running n8n**
-(currently DOWN). The viz deploy needs only those two — it does NOT need `NODE_FUNCTION_ALLOW_BUILTIN`
-(that gate is bridge-only, for B-3).
-
-**Correct successor action — small and TERMINAL:**
-1. **Block C-3.** In `_workspace/backlog.md`, change the C-3 line to:
-   `- [!] blocked: needs APPLY (N8N_APPLY=1) + running n8n (outward deploy)`
-   (do **not** force, do **not** deploy). This is one cycle's work, a SAFE refusal exactly like B-3.
-2. **Write `_workspace/DONE`** (the loop's terminal sentinel) with evidence:
-   - Full commit list: A-1..A-4, B-1..B-2, B-3(blocked), C-1..C-2, C-3(blocked) — every item resolved.
-   - Gate outcomes: all builds/`git diff --check`/`validate_workflow` runs **green**; the **two (APPLY)
-     items B-3 + C-3 are blocked-and-surfaced** (not failed).
-   - One-line "what a human must do to finish": run with `N8N_APPLY=1` + a running n8n (container profile,
-     both MCP surfaces) to unblock B-3 and C-3; **for B-3 only**, also set
-     `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs` on the instance before deploy.
-3. **Commit** the DONE sentinel + ledger update, report, and **STOP — do not re-fire** (terminal).
-   The relay does the commit; do not commit yourself if running under the relay.
-
-After this, the backlog is **fully resolved** (every item `- [x]` or `- [!]`) with **2 APPLY items left
-for a human**. The loop is finished. Do NOT deploy, do NOT start new epics, do NOT keep cycling.
-
-## Open findings / blockers (the two NEEDS-HUMAN items left after DONE)
-- **B-3 (APPLY) — BLOCKED** (`dda9780acc`). To go live, a human needs: `N8N_APPLY=1`, a booted
-  container-profile n8n (both MCP surfaces), AND `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs`
-  on the instance before deploy. Validated artifact ready: `_workspace/wf/claude-n8n-chat-bridge.json`.
-- **C-3 (APPLY) — WILL BLOCK** on resume (last item). To go live: `N8N_APPLY=1` + running n8n. Validated
-  artifacts ready: `_workspace/viz/0{1,2,3}-*.json`. No bridge env needed.
-- No failing gates. **No contradiction** between backlog and commits (both agree: 0-1, A-1..A-4, B-1..B-2,
-  C-1..C-2 done; B-3 blocked; C-3 is the sole pending and is APPLY).
-- The untracked `.claude/scheduled_tasks.lock` is the only non-clean status entry — transient, ignore.
-
-## Decisions & dead ends
-- **n8n rejects cyclic workflow graphs** (C-2 finding): broke the Ralph loop back-edge and the
-  meta↔meta-mcp 2-cycle via node annotations rather than real `main` edges; recorded in `MAPPING.md §3`.
-  A successor regenerating viz must keep graphs acyclic.
-- **C-2 scope is 3 master diagrams, not per-repo** (build-spine / runtime-dataflow / n8n-execution),
-  bounded explicitly in C-1's MAPPING.md (no silent truncation of the 51-repo set).
-- **Bridge uses a Code node + `execFile` argv path, NOT Execute Command** (spec gate G1) — avoids shell
-  injection; consequence is the `NODE_FUNCTION_ALLOW_BUILTIN` gate that blocks B-3 until set.
-- **`.gitignore` carve-out** un-ignores durable deliverables so they survive cold resume: ledger/sentinels,
-  the three map files, the spec, `_workspace/wf/*.json`, `_workspace/viz/MAPPING.md` + `_workspace/viz/*.json`.
-- A-4 / viz were synthesized **from the committed map files**, NOT by re-indexing — cheaper, deterministic.
-- SAFE-mode rule (backlog Notes): a down runtime → mark the (APPLY) item blocked/NEEDS-HUMAN, never "failed".
+## Verify-on-resume baseline
+```bash
+git -C ~/Desktop/meta/n8n branch --show-current           # develop (or the feature branch)
+git -C ~/Desktop/meta/n8n status --short                  # expect clean (ignore .claude/scheduled_tasks.*)
+git -C ~/Desktop/meta/n8n log --oneline -3
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5678/healthz   # 200 if n8n up
+( cd ~/Desktop/meta/n8n/packages/cli/bin && ./n8n list:workflow )        # the 4 harness workflows persisted in ~/.n8n
+```
+Then re-read `_workspace/backlog.md` (A/B/C + D-0 are `- [x]`; D-1..D-4 are the open `- [ ]`) and
+`_workspace/loop_state.md`. Apply the RESUME-reset, then continue at D-1.
 
 ## Runtime watch
-- **n8n is DOWN** at handoff, and **it is not needed** to finish the loop — the remaining work is
-  blocking C-3 + writing `_workspace/DONE` (pure on-disk, SAFE). No `/healthz`, no MCP surface required.
-- n8n is needed **only by a human** later to unblock the two APPLY items (B-3, C-3): boot via
-  `n8n:run-n8n` (container profile, per `n8n:runtime`), confirm `/healthz` 200, re-confirm both MCP
-  surfaces (n8n-mcp + n8n-builtin Bearer token), and (B-3 only) set `NODE_FUNCTION_ALLOW_BUILTIN`.
-  That is a human task outside the loop, not a successor cycle.
-
-## Verify-on-resume (cheapest gate that proves a sane baseline — run these FIRST)
-```bash
-git -C /home/drdave/Desktop/meta/n8n status --short          # clean (ignore .claude/scheduled_tasks.lock)
-git -C /home/drdave/Desktop/meta/n8n log --oneline -5        # expect: <relay handoff> / 517b02ae6b C-2 / 22b5f6fd87 C-1 / dda9780acc B-3 / 06baa94b39 handoff
-# durable viz/wf/spec deliverables present (the C-2 artifacts are the newest):
-ls -1 _workspace/viz/0?-*.json _workspace/viz/MAPPING.md _workspace/wf/claude-n8n-chat-bridge.json
-```
-Then re-read state before mutating anything:
-```bash
-cat _workspace/backlog.md        # only C-3 is `- [ ]`, and it is (APPLY)
-cat _workspace/loop_state.md     # confirm apply_mode=0, cycles_total=10
-```
-No build/test gate is needed to resume — this loop produced **doc/spec/JSON artifacts only** (no compiled
-source touched), so a clean tree + correct git log + present deliverables is a sufficient baseline.
-Do NOT run a full monorepo build to gate the resume. Apply the RESUME-reset
-(cycles_this_session=0, keep cycles_total=10), then execute the terminal NEXT ITEM (block C-3 → DONE → STOP).
+- n8n was UP on :5678 (source `node ./n8n`, started with `NODE_FUNCTION_ALLOW_BUILTIN`,
+  log `_workspace/01g_apply_n8n.log`). It may have been replaced by docker (D-1) by the time you read
+  this. `scripts/n8n-up.sh` kills the source instance before binding docker — never run both on the
+  SQLite DB at once.
+- Docker access: the in-IDE agent has none (`/var/run/docker.sock` permission denied); the user's
+  shell / the ralph runner does.

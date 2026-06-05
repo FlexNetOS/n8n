@@ -125,6 +125,26 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         deferred. To finish: with n8n up + `N8N_APPLY=1`, import each JSON via the n8n MCP server and
         confirm it renders. Surfaced for a human in `_workspace/DONE`.
 
+## Epic D — productionize the live deploy (opened 2026-06-05, APPLY session)
+> Epics A/B/C are complete (incl. the live APPLY deploys). Epic D is the productionization tail.
+> SAFE-doable items can run in any session; D-1 needs **docker daemon access** — the in-IDE agent
+> lacks it (docker.sock permission denied), but the `ralph-n8n.sh` runner (a `claude -p` in the
+> user's docker-enabled shell) can do it. Persistence is already done (see D-0).
+- [x] D-0: Persist the 4 deployed workflows into `~/.n8n` so a dockerized n8n that mounts it comes up
+      with them. Done 2026-06-05: `n8n import:workflow` of the committed JSONs (+ stable ids) →
+      `~/.n8n` now has all 4 (CLI `list:workflow` = 6 total; bridge exported with the `$env` +
+      cred-injection code intact). Reproducible via `scripts/n8n-import-workflows.sh`.
+- [ ] D-1: **(APPLY, needs docker)** Bring up the dockerized n8n on :5678 mounting `~/.n8n`:
+      `pnpm build:docker` (if `n8nio/n8n:local` not built) → `scripts/n8n-up.sh`. Verify `/healthz` 200
+      and that all 4 workflows are present (`search_workflows`) and render. `scripts/n8n-down.sh` to stop.
+      Blocks in any session without docker.sock access → mark `- [!] blocked: needs docker-enabled shell`.
+- [ ] D-2: Triage **Dependabot PR #1** (`chore(deps): Bump the uv group …` — Python uv deps under
+      `ai-workflow-builder.ee/evaluations`). Review the bump; merge if CI green, else close with reason.
+- [ ] D-3: Add a CI/check that runs `validate_workflow` over the committed `_workspace/{wf,viz}/*.json`
+      so the harness workflows can't silently rot. SAFE (authoring only).
+- [ ] D-4: Decide bridge activation policy: keep `ggvV5wItgjsRnwFk` **inactive** (current safe default)
+      vs. enabling it behind chat auth (G6). A security decision — document the call; do not auto-enable.
+
 ## Notes / dependencies
 - Item 2 ("use the MCP server") is satisfied structurally: every runtime-affecting cycle verifies via
   `n8n:run-n8n` + the n8n MCP server, and Epics B/C author workflows through `n8n:workflow-ops`.
