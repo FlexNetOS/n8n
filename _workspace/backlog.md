@@ -66,9 +66,11 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs` (recorded as a B-3 gate in the spec §7).
         Carved wf JSON out of `.gitignore`. Not deployed (SAFE). Verify: validate valid · JSON parses ·
         tracked-eligible.
-- [!] B-3: **(APPLY)** Deploy the bridge to the local n8n and smoke a chat round-trip
+- [ ] B-3: **(APPLY)** Deploy the bridge to the local n8n and smoke a chat round-trip
       (chat in → claude responds) via the n8n MCP server.
-      - 2026-06-05 blocked (SAFE refusal of outward/irreversible action). Three unmet gates, all
+      - 2026-06-05 REOPENED in APPLY mode (user authorized N8N_APPLY=1; n8n up). NOTE: smoke needs
+        n8n restarted with NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs (Code-node sandbox).
+      - 2026-06-05 (prior, SAFE) blocked. Three unmet gates, all
         requiring a human/operator decision: (1) **APPLY mode** — currently `apply_mode=0`; run with
         `N8N_APPLY=1` to permit deploy. (2) **Instance env** `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,
         path,fs` — the bridge's secure `execFile` Code node is sandboxed without it (spec §7); plus
@@ -95,9 +97,15 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         0 errors** (only expected no-trigger warning). Finding: n8n rejects cycles — broke the Ralph
         back-edge + meta↔meta-mcp 2-cycle via node annotations (updated MAPPING §3). SAFE: validated,
         not deployed. Verify: 3/3 validate valid · JSON parses · acyclic · tracked-eligible.
-- [!] C-3: **(APPLY)** Deploy the visualization workflows to the local n8n; verify each renders and
+- [x] C-3: **(APPLY)** Deploy the visualization workflows to the local n8n; verify each renders and
       reflects the real data flow.
-      - 2026-06-05 blocked (SAFE refusal of outward/irreversible action). Two unmet gates for a human:
+      - 2026-06-05 DONE (APPLY): deployed all 3 viz workflows to local n8n via the n8n-builtin MCP
+        surface (n8n-mcp mgmt was SSRF-blocked on localhost). IDs: build-spine `ghqgmnJnB8zMMmAN`,
+        runtime-dataflow `baU04FGqVHA0pntk`, n8n-execution `7z11ihYBJ7soxaik`. All inactive drafts,
+        node/connection/sticky fidelity verified live via get_workflow_details + search_workflows.
+        Renderable in the editor (faithful to the A-4 data-flow map). Not activated (inert diagrams).
+      - 2026-06-05 REOPENED in APPLY mode (user authorized N8N_APPLY=1; n8n up).
+      - 2026-06-05 (prior, SAFE) blocked. Two unmet gates for a human:
         (1) **APPLY mode** (`N8N_APPLY=1`); (2) **running n8n** on the container profile with the
         n8n MCP surfaces (down at handoff; boot via `n8n:run-n8n`). The 3 validated viz workflows
         (`_workspace/viz/0{1,2,3}-*.json`, C-2) are ready to deploy as-is — only the outward push is
