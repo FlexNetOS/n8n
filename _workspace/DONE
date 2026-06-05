@@ -1,0 +1,50 @@
+# n8n-loop DONE — 2026-06-05T20:05Z
+
+The durable backlog (`_workspace/backlog.md`) is **fully resolved**: every item is `- [x]` (done +
+verified) or `- [!]` (blocked, surfaced for a human). No `- [ ]` remain. All SAFE-doable work is
+complete; the only open items are **APPLY/human** actions that this SAFE session is correctly refusing
+to take.
+
+## Backlog outcome by epic
+- **Epic 0** (loop self-test): 0-1 ✅
+- **Epic A** (map the meta codebase): A-1..A-4 ✅ — inventory (51 repos), code-intel index
+  (207,954 symbols), automation codemap, cross-repo dataflow mermaid. (`_workspace/meta-*.md`)
+- **Epic B** (Claude CLI ↔ n8n chat bridge): B-1 spec ✅, B-2 validated JSON ✅, B-3 live deploy +
+  round-trip + injection-rejection ✅ (workflow `ggvV5wItgjsRnwFk`, inactive).
+- **Epic C** (visualize data flow in n8n): C-1 mapping ✅, C-2 3 validated viz workflows ✅,
+  C-3 deployed live ✅ (`ghqgmnJnB8zMMmAN`, `baU04FGqVHA0pntk`, `7z11ihYBJ7soxaik`, inactive).
+- **Epic D** (productionize the live deploy):
+  - D-0 ✅ persisted 4 workflows into `~/.n8n` (`scripts/n8n-import-workflows.sh`).
+  - D-1 `- [!]` blocked — docker bring-up needs a docker-enabled shell (in-IDE agent: `docker info` →
+    permission denied on `/var/run/docker.sock`). APPLY/human.
+  - D-2 `- [!]` blocked — Dependabot PR #1 triaged (low-risk uv/pytest 9.0.3 bump; CI red only because
+    the `chore(deps)` title scope `deps` isn't an allowed n8n scope). Merge is outward → APPLY/human.
+  - D-3 ✅ workflow-validate CI authored (`scripts/validate-harness-workflows.mjs` +
+    `.github/workflows/harness-workflows-validate.yml`).
+  - D-4 ✅ (this cycle) bridge activation policy → **keep INACTIVE**
+    (`_workspace/D-4-bridge-activation-policy.md`).
+
+## Evidence (this resume session, SAFE)
+- **Resume baseline:** branch `harness/epic-d`; n8n `/healthz` **200**; `validate-harness-workflows.mjs`
+  **4/4 valid (exit 0)**; tree clean; `docker info` **DENIED**; `N8N_APPLY` unset → SAFE.
+- **D-4 grounding:** live `search_workflows query="claude"` → `ggvV5wItgjsRnwFk` `active:false`,
+  `triggerCount:0`. No workflow mutated.
+- **Gates:** `git diff --check` clean. Decision doc + backlog/ledger committed (hash recorded in commit).
+- **Ledger:** `cycles_this_session=1`, `cycles_total=19`, `cycle_budget=3`, `apply_mode=0`.
+
+## APPLY tail — what a human / `N8N_APPLY=1` / docker-enabled session must still do
+These are outward/irreversible and were deliberately NOT taken in SAFE:
+1. **Push this branch + open the PR.** `git push -u origin harness/epic-d` then
+   `gh pr create --base develop` (auto-merge on green). NEVER push `master` (classifier denies; desired).
+   Note: `harness/epic-d` branches off `harness/apply-deploy-persist` → **PR #4** (open, auto-merge ON);
+   once #4 merges to develop those commits drop out of epic-d's diff.
+2. **D-1 docker bring-up** (needs a docker-enabled shell — the user's terminal or the `ralph-n8n.sh`
+   runner): `pnpm build:docker` (once) → `scripts/n8n-up.sh` → verify `/healthz` 200 + all 4 workflows
+   render (they're already in `~/.n8n` from D-0, so the mount carries them).
+3. **D-2 Dependabot #1** (maintainer): `gh pr edit 1 --title 'chore: bump uv group (pytest 9.0.3, task-runner-python lock) (no-changelog)'` then merge once `check-pr-title` passes.
+4. **(optional) bridge activation** — only if the D-4 precondition checklist is met
+   (`_workspace/D-4-bridge-activation-policy.md`); APPLY + explicit human sign-off. Default stays inactive.
+
+## Runtime watch
+- n8n UP on :5678 (source run, `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs`). May be
+  replaced by the dockerized instance once D-1 is done.

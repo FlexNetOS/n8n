@@ -134,16 +134,48 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
       with them. Done 2026-06-05: `n8n import:workflow` of the committed JSONs (+ stable ids) →
       `~/.n8n` now has all 4 (CLI `list:workflow` = 6 total; bridge exported with the `$env` +
       cred-injection code intact). Reproducible via `scripts/n8n-import-workflows.sh`.
-- [ ] D-1: **(APPLY, needs docker)** Bring up the dockerized n8n on :5678 mounting `~/.n8n`:
+- [!] D-1: **(APPLY, needs docker)** Bring up the dockerized n8n on :5678 mounting `~/.n8n`:
       `pnpm build:docker` (if `n8nio/n8n:local` not built) → `scripts/n8n-up.sh`. Verify `/healthz` 200
       and that all 4 workflows are present (`search_workflows`) and render. `scripts/n8n-down.sh` to stop.
-      Blocks in any session without docker.sock access → mark `- [!] blocked: needs docker-enabled shell`.
-- [ ] D-2: Triage **Dependabot PR #1** (`chore(deps): Bump the uv group …` — Python uv deps under
+      - 2026-06-05 blocked: this session's `docker info` → permission denied on `/var/run/docker.sock`
+        (the in-IDE agent is not in the docker group), and it's an APPLY/outward step besides. Persistence
+        (D-0) is already done, so the bring-up itself is the only gap. **Unblock path:** run in a
+        docker-enabled shell — the user's terminal or the `ralph-n8n.sh` runner (`claude -p` in that
+        shell): `pnpm build:docker` (once) then `scripts/n8n-up.sh`. Re-grounded each resume.
+- [!] D-2: Triage **Dependabot PR #1** (`chore(deps): Bump the uv group …` — Python uv deps under
       `ai-workflow-builder.ee/evaluations`). Review the bump; merge if CI green, else close with reason.
-- [ ] D-3: Add a CI/check that runs `validate_workflow` over the committed `_workspace/{wf,viz}/*.json`
+      - 2026-06-05 TRIAGED (SAFE; the merge/close itself is outward → APPLY/human). Findings:
+        - **Low risk.** 4 files: `ai-workflow-builder.ee/evaluations/programmatic/python/{pyproject,uv.lock}`
+          (pytest `9.0.1 → 9.0.3`, a patch test-dep bump) + `task-runner-python/{pyproject,uv.lock}`
+          (lock refresh). `MERGEABLE`. Python-only → JS/TS CI lanes correctly *skip*.
+        - **Why CI is red:** `check-pr-title` **fails** because Dependabot's title `chore(deps)` uses
+          scope `deps`, which is NOT in n8n's allowed scopes (API|benchmark|core|editor|\*Node) — see
+          `.github/pull_request_title_conventions.md`. Also `Required Checks` fail (aggregate) and the
+          usual non-blocking `Verify CLA` fail (same bot that didn't block #2/#3).
+        - **Recommendation (for an APPLY session / human):** safe to merge once the **title is fixed**
+          to drop the invalid scope, e.g. `chore: bump uv group (pytest 9.0.3, task-runner-python lock) (no-changelog)`.
+          Dependabot can't self-edit its title; a maintainer edits it (`gh pr edit 1 --title …`), then
+          `check-pr-title` passes and it can merge. Not done here — title edit + merge are outward (APPLY).
+- [x] D-3: Add a CI/check that runs `validate_workflow` over the committed `_workspace/{wf,viz}/*.json`
       so the harness workflows can't silently rot. SAFE (authoring only).
-- [ ] D-4: Decide bridge activation policy: keep `ggvV5wItgjsRnwFk` **inactive** (current safe default)
+      - 2026-06-05 DONE (SAFE authoring). `scripts/validate-harness-workflows.mjs` — dependency-free
+        Node validator (no n8n/docker): JSON parse, required fields, unique node names, node
+        type/typeVersion present, connections reference existing nodes, and **cycle detection** (n8n
+        rejects cyclic graphs — the C-2 failure mode). `.github/workflows/harness-workflows-validate.yml`
+        runs it on PRs to develop/master touching the workflow JSONs. Verify: 4/4 committed JSON pass
+        (exit 0); negative test (injected cycle + dangling ref) correctly fails (exit 1); CI YAML parses.
+- [x] D-4: Decide bridge activation policy: keep `ggvV5wItgjsRnwFk` **inactive** (current safe default)
       vs. enabling it behind chat auth (G6). A security decision — document the call; do not auto-enable.
+      - 2026-06-05 DONE (SAFE, decision doc). Decision: **keep INACTIVE** — `_workspace/D-4-bridge-
+        activation-policy.md`. Grounded on live state (`search_workflows`: `active:false`, triggerCount 0)
+        + spec gates G1–G7. Rationale: 3 residual risks make unattended/public activation unwise — (1)
+        the B-3 cred-copy puts `~/.claude/.credentials.json` in the sandbox HOME, Read-reachable even
+        under `--permission-mode plan`, and the G4 redaction shape may not catch the subscription token;
+        (2) G2 is a denylist (incomplete by nature); (3) `public:true` widens blast radius. Epic B already
+        proved the capability (B-3), so activation adds exposure without new value. Documented a 5-item
+        APPLY+human precondition checklist (cred hygiene / G6 auth / rate-limit+audit / re-confirm plan
+        mode+caps / explicit sign-off) for any future activation. The loop does NOT auto-enable. No
+        workflow mutated (SAFE). Verify: live state read not assumed · `git diff --check` clean.
 
 ## Notes / dependencies
 - Item 2 ("use the MCP server") is satisfied structurally: every runtime-affecting cycle verifies via
