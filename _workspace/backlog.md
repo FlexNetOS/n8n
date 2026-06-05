@@ -87,8 +87,14 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         scope (no silent truncation). Node facts grounded via n8n-mcp. Verify: `git diff --check` clean
         · embedded example workflow `validate_workflow` = **valid, 0 errors** (only expected no-trigger
         warning) · tracked-eligible.
-- [ ] C-2: Generate one validated n8n visualization workflow per meta repo (or a master) from the A-4
+- [x] C-2: Generate one validated n8n visualization workflow per meta repo (or a master) from the A-4
       data-flow map via `n8n:workflow-ops` → `_workspace/viz/*.json` (validated, not deployed).
+      - 2026-06-05: generated 3 master viz workflows (per C-1 scope) from the A-4 views →
+        `_workspace/viz/0{1,2,3}-*.json`: 01-build-spine (11 noOp+3 sticky), 02-runtime-dataflow
+        (17 noOp+5 sticky), 03-n8n-execution (13 noOp+2 sticky). All `validate_workflow` = **valid,
+        0 errors** (only expected no-trigger warning). Finding: n8n rejects cycles — broke the Ralph
+        back-edge + meta↔meta-mcp 2-cycle via node annotations (updated MAPPING §3). SAFE: validated,
+        not deployed. Verify: 3/3 validate valid · JSON parses · acyclic · tracked-eligible.
 - [ ] C-3: **(APPLY)** Deploy the visualization workflows to the local n8n; verify each renders and
       reflects the real data flow.
 

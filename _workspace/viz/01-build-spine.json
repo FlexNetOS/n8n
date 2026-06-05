@@ -1,0 +1,290 @@
+{
+  "name": "meta — build/dependency spine (viz, do-not-run)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Foundation libs\nno workspace deps",
+        "height": 780,
+        "width": 220,
+        "color": 7
+      },
+      "id": "s-7065438839",
+      "name": "grp: Foundation libs",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Mid-level CLIs\nloop + host",
+        "height": 520,
+        "width": 220,
+        "color": 4
+      },
+      "id": "s-7681279463",
+      "name": "grp: Mid-level CLIs",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        220,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Plugin CLIs\nsubprocess plugins + MCP",
+        "height": 720,
+        "width": 240,
+        "color": 5
+      },
+      "id": "s-3969431166",
+      "name": "grp: Plugin CLIs",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        520,
+        -60
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "n-1993971422",
+      "name": "loop_lib",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Rust · 60 sym · lib (loop-lib)"
+    },
+    {
+      "parameters": {},
+      "id": "n-4213922164",
+      "name": "meta_plugin_protocol",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        140
+      ],
+      "notes": "Rust · 16 sym · lib (plugin-protocol)"
+    },
+    {
+      "parameters": {},
+      "id": "n-8182736216",
+      "name": "meta_plugin_api",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        280
+      ],
+      "notes": "Rust · 21 sym · lib"
+    },
+    {
+      "parameters": {},
+      "id": "n-3815560035",
+      "name": "meta_core",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        420
+      ],
+      "notes": "Rust · 102 sym · lib (meta-core)"
+    },
+    {
+      "parameters": {},
+      "id": "n-9923795529",
+      "name": "meta_git_lib",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        560
+      ],
+      "notes": "Rust · 279 sym · lib (meta-git-lib)"
+    },
+    {
+      "parameters": {},
+      "id": "n-739002345",
+      "name": "loop_cli",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        260,
+        0
+      ],
+      "notes": "Rust · bin: loop"
+    },
+    {
+      "parameters": {},
+      "id": "n-6990488471",
+      "name": "meta_cli",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        260,
+        300
+      ],
+      "notes": "Rust · 432 sym · bin: meta (HOST)"
+    },
+    {
+      "parameters": {},
+      "id": "n-6568927725",
+      "name": "meta_git_cli",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        560,
+        0
+      ],
+      "notes": "Rust · bin: meta-git"
+    },
+    {
+      "parameters": {},
+      "id": "n-7633732152",
+      "name": "meta_project_cli",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        560,
+        160
+      ],
+      "notes": "Rust · bin: meta-project"
+    },
+    {
+      "parameters": {},
+      "id": "n-9785570175",
+      "name": "meta_rust_cli",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        560,
+        320
+      ],
+      "notes": "Rust · bin: meta-rust"
+    },
+    {
+      "parameters": {},
+      "id": "n-3284762600",
+      "name": "meta_mcp",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        560,
+        480
+      ],
+      "notes": "Rust · 72 sym · bin: meta-mcp (MCP server)"
+    }
+  ],
+  "connections": {
+    "loop_lib": {
+      "main": [
+        [
+          {
+            "node": "loop_cli",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "meta_cli",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "meta_git_cli",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta_core": {
+      "main": [
+        [
+          {
+            "node": "meta_cli",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta_plugin_protocol": {
+      "main": [
+        [
+          {
+            "node": "meta_cli",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "meta_git_cli",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "meta_project_cli",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "meta_rust_cli",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta_git_lib": {
+      "main": [
+        [
+          {
+            "node": "meta_git_cli",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "meta_project_cli",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta_cli": {
+      "main": [
+        [
+          {
+            "node": "meta_git_cli",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "meta_project_cli",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "meta_rust_cli",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "meta_mcp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -28,10 +28,13 @@ These workflows **visualize** structure; they are never triggered or run. So:
 - Each **directed data-flow edge** in A-4 (View 1 deps, View 2 runtime flow, View 3 n8n execution)
   becomes a `connections[<source name>].main[0] += { node: <target name>, type: "main", index: 0 }`.
 - Edge direction follows the arrow in the mermaid source (`A --> B` ⇒ connection from A to B).
-- Bidirectional edges (e.g. `agent <--> weave`) are emitted as **two** connections (A→B and B→A).
+- **The graph MUST stay acyclic** — `validate_workflow` rejects any cycle (incl. a 2-cycle) with a
+  hard error ("Workflow contains a cycle"). So **bidirectional / back / loop-closing edges are NOT
+  drawn as connections** — keep the single forward edge and **annotate the reverse relationship on a
+  node's `notes`** instead. (Learned in C-2: `agent→ledger→ralph→agent` and `meta↔meta-mcp` both had
+  to be broken this way.) Pick the forward direction that yields a DAG; annotate the rest.
 - Dotted/"observes" edges (e.g. `runtime -. health .-> broker`) are emitted as normal `main`
-  connections; n8n has no dotted-edge concept — annotate the *target* node's `notes` with the
-  relationship label instead.
+  connections **only if** they don't introduce a cycle; otherwise annotate (same rule as above).
 
 ## 4. Group → Sticky Note mapping
 Each **subgraph / layer** in the A-4 views becomes one `n8n-nodes-base.stickyNote` `typeVersion:1`

@@ -1,0 +1,477 @@
+{
+  "name": "meta workspace — runtime data-flow (viz, do-not-run)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## External agent + harness\nclaude -p, Ralph loop, durable ledger",
+        "height": 520,
+        "width": 620,
+        "color": 1
+      },
+      "id": "s-88631603",
+      "name": "grp: External agent + harness",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## MCP servers\nagent ↔ tools",
+        "height": 880,
+        "width": 220,
+        "color": 5
+      },
+      "id": "s-5030265291",
+      "name": "grp: MCP servers",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## meta orchestration\nhost CLI + subprocess plugins → 51 repos",
+        "height": 460,
+        "width": 560,
+        "color": 4
+      },
+      "id": "s-9326272982",
+      "name": "grp: meta orchestration",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        500,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## weave mesh\nRust broker, libSQL",
+        "height": 160,
+        "width": 220,
+        "color": 6
+      },
+      "id": "s-1795159859",
+      "name": "grp: weave mesh",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        520,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## n8n runtime\ntriggers → runner → queue → workers",
+        "height": 200,
+        "width": 1060,
+        "color": 3
+      },
+      "id": "s-9597169847",
+      "name": "grp: n8n runtime",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        520,
+        700
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "n-7930900819",
+      "name": "human / operator",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "starts the agent"
+    },
+    {
+      "parameters": {},
+      "id": "n-2913873078",
+      "name": "claude -p (agent)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        160
+      ],
+      "notes": "Claude Code CLI — drives meta + n8n via MCP"
+    },
+    {
+      "parameters": {},
+      "id": "n-1522931699",
+      "name": "meta",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        280,
+        300
+      ],
+      "notes": "Rust · host CLI — orchestrates 51 repos"
+    },
+    {
+      "parameters": {},
+      "id": "n-5476412927",
+      "name": "meta-git plugin",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        540,
+        220
+      ],
+      "notes": "subprocess plugin"
+    },
+    {
+      "parameters": {},
+      "id": "n-7844802943",
+      "name": "meta-project plugin",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        540,
+        360
+      ],
+      "notes": "subprocess plugin"
+    },
+    {
+      "parameters": {},
+      "id": "n-2934684050",
+      "name": "meta-rust plugin",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        540,
+        500
+      ],
+      "notes": "subprocess plugin"
+    },
+    {
+      "parameters": {},
+      "id": "n-4143023609",
+      "name": "child repos (51)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        820,
+        360
+      ],
+      "notes": "clone · exec · worktree · git"
+    },
+    {
+      "parameters": {},
+      "id": "n-3708530240",
+      "name": "meta-mcp",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        280,
+        60
+      ],
+      "notes": "MCP: meta_* tools (exposes the meta CLI to agents — the meta→meta-mcp 'exposes' relation is annotated here, not drawn, to keep the diagram acyclic per MAPPING §3)"
+    },
+    {
+      "parameters": {},
+      "id": "n-2978055904",
+      "name": "weave (MCP)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        280,
+        600
+      ],
+      "notes": "MCP: weave_* tools"
+    },
+    {
+      "parameters": {},
+      "id": "n-8392260642",
+      "name": "n8n-mcp + n8n-builtin",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        280,
+        760
+      ],
+      "notes": "MCP: n8n_* / 28 workflow tools"
+    },
+    {
+      "parameters": {},
+      "id": "n-9153203477",
+      "name": "weave broker",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        560,
+        600
+      ],
+      "notes": "Rust · libSQL mesh — peers by peer_id"
+    },
+    {
+      "parameters": {},
+      "id": "n-4013078112",
+      "name": "n8n triggers",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        560,
+        760
+      ],
+      "notes": "ScheduleTrigger · webhooks · Chat (Epic B)"
+    },
+    {
+      "parameters": {},
+      "id": "n-5567549634",
+      "name": "workflow-runner",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        820,
+        760
+      ],
+      "notes": "n8n execution entry"
+    },
+    {
+      "parameters": {},
+      "id": "n-1017286840",
+      "name": "scaling queue",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        760
+      ],
+      "notes": "Bull / Redis / multi-main"
+    },
+    {
+      "parameters": {},
+      "id": "n-1005850758",
+      "name": "workers",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        760
+      ],
+      "notes": "pnpm worker"
+    },
+    {
+      "parameters": {},
+      "id": "n-9051533542",
+      "name": "ralph-n8n.sh",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -280,
+        160
+      ],
+      "notes": "spawns claude -p per cycle (Ralph); reads the committed _workspace ledger each cycle (back-edge, annotated not connected per MAPPING §3 to keep the diagram acyclic)"
+    },
+    {
+      "parameters": {},
+      "id": "n-7898209170",
+      "name": "_workspace ledger",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        360
+      ],
+      "notes": "backlog + ledger + HANDOFF (committed)"
+    }
+  ],
+  "connections": {
+    "human / operator": {
+      "main": [
+        [
+          {
+            "node": "claude -p (agent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "claude -p (agent)": {
+      "main": [
+        [
+          {
+            "node": "meta-mcp",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "weave (MCP)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "n8n-mcp + n8n-builtin",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "weave broker",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "_workspace ledger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta-mcp": {
+      "main": [
+        [
+          {
+            "node": "meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "weave (MCP)": {
+      "main": [
+        [
+          {
+            "node": "weave broker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8n-mcp + n8n-builtin": {
+      "main": [
+        [
+          {
+            "node": "n8n triggers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta": {
+      "main": [
+        [
+          {
+            "node": "meta-git plugin",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "meta-project plugin",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "meta-rust plugin",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "child repos (51)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta-git plugin": {
+      "main": [
+        [
+          {
+            "node": "child repos (51)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta-project plugin": {
+      "main": [
+        [
+          {
+            "node": "child repos (51)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "meta-rust plugin": {
+      "main": [
+        [
+          {
+            "node": "child repos (51)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8n triggers": {
+      "main": [
+        [
+          {
+            "node": "weave broker",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "workflow-runner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "workflow-runner": {
+      "main": [
+        [
+          {
+            "node": "scaling queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "scaling queue": {
+      "main": [
+        [
+          {
+            "node": "workers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ralph-n8n.sh": {
+      "main": [
+        [
+          {
+            "node": "claude -p (agent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

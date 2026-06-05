@@ -1,0 +1,329 @@
+{
+  "name": "n8n — internal execution flow (viz, do-not-run)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Inbound\ntrigger surfaces",
+        "height": 620,
+        "width": 220,
+        "color": 3
+      },
+      "id": "s-5404005044",
+      "name": "grp: Inbound",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## HA (queue mode)\nmulti-main leader election",
+        "height": 160,
+        "width": 540,
+        "color": 2
+      },
+      "id": "s-4514634423",
+      "name": "grp: HA (queue mode)",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        860,
+        460
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "n-1399958720",
+      "name": "ScheduleTrigger",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "cron/interval trigger node"
+    },
+    {
+      "parameters": {},
+      "id": "n-7086945416",
+      "name": "Webhook (live/test/waiting)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        140
+      ],
+      "notes": "inbound HTTP triggers"
+    },
+    {
+      "parameters": {},
+      "id": "n-8219071785",
+      "name": "Chat Trigger",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        280
+      ],
+      "notes": "Epic B bridge"
+    },
+    {
+      "parameters": {},
+      "id": "n-6960851955",
+      "name": "n8n-builtin MCP",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        0,
+        420
+      ],
+      "notes": "execute_workflow"
+    },
+    {
+      "parameters": {},
+      "id": "n-5567549634",
+      "name": "workflow-runner",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        320,
+        200
+      ],
+      "notes": "routes regular vs queue"
+    },
+    {
+      "parameters": {},
+      "id": "n-121426110",
+      "name": "in-process execution",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        620,
+        80
+      ],
+      "notes": "regular mode"
+    },
+    {
+      "parameters": {},
+      "id": "n-2049626125",
+      "name": "Bull queue (Redis)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        620,
+        320
+      ],
+      "notes": "queue mode"
+    },
+    {
+      "parameters": {},
+      "id": "n-417198842",
+      "name": "job-processor",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        900,
+        320
+      ],
+      "notes": "dequeue + run"
+    },
+    {
+      "parameters": {},
+      "id": "n-2967954902",
+      "name": "worker-server",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        320
+      ],
+      "notes": "pnpm worker"
+    },
+    {
+      "parameters": {},
+      "id": "n-9790790259",
+      "name": "node execution engine",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        120
+      ],
+      "notes": "runs the nodes"
+    },
+    {
+      "parameters": {},
+      "id": "n-6037376304",
+      "name": "Respond / output",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1460,
+        120
+      ],
+      "notes": "reply · data tables"
+    },
+    {
+      "parameters": {},
+      "id": "n-532839305",
+      "name": "multi-main-setup",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        900,
+        520
+      ],
+      "notes": "HA (queue mode)"
+    },
+    {
+      "parameters": {},
+      "id": "n-3981850200",
+      "name": "leader-election",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        520
+      ],
+      "notes": "leader-election-client"
+    }
+  ],
+  "connections": {
+    "ScheduleTrigger": {
+      "main": [
+        [
+          {
+            "node": "workflow-runner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook (live/test/waiting)": {
+      "main": [
+        [
+          {
+            "node": "workflow-runner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "workflow-runner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "n8n-builtin MCP": {
+      "main": [
+        [
+          {
+            "node": "workflow-runner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "workflow-runner": {
+      "main": [
+        [
+          {
+            "node": "in-process execution",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Bull queue (Redis)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bull queue (Redis)": {
+      "main": [
+        [
+          {
+            "node": "job-processor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "multi-main-setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "job-processor": {
+      "main": [
+        [
+          {
+            "node": "worker-server",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "in-process execution": {
+      "main": [
+        [
+          {
+            "node": "node execution engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "worker-server": {
+      "main": [
+        [
+          {
+            "node": "node execution engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node execution engine": {
+      "main": [
+        [
+          {
+            "node": "Respond / output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "multi-main-setup": {
+      "main": [
+        [
+          {
+            "node": "leader-election",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
