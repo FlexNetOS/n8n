@@ -1,0 +1,109 @@
+{
+  "name": "Claude↔n8n chat bridge (SAFE, do-not-activate)",
+  "nodes": [
+    {
+      "parameters": {
+        "public": false,
+        "options": {}
+      },
+      "id": "11111111-1111-4111-8111-111111111111",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// G2 guard — fail closed. Validates BEFORE any execution.\nconst item = $input.first();\nconst raw = (item.json.chatInput ?? item.json.input ?? '').toString();\nconst MAX = 2000;\nconst CHARSET = /^[A-Za-z0-9 _.,:;!?@/#%()'\\\"\\n-]*$/;\nconst DENY = [/rm\\s+-rf/i, /\\/etc\\//i, /~\\/\\.ssh/i, /\\.env/i, /secret/i, /token/i, /password/i, /--dangerous/i, /\\bsudo\\b/i, /\\bcurl\\b/i, /\\bwget\\b/i, /\\bssh\\b/i, /base64/i, />\\s*\\//];\nlet allowed = true; let reason = 'ok';\nif (raw.length === 0) { allowed = false; reason = 'empty'; }\nelse if (raw.length > MAX) { allowed = false; reason = 'too long'; }\nelse if (!CHARSET.test(raw)) { allowed = false; reason = 'charset'; }\nelse { for (const re of DENY) { if (re.test(raw)) { allowed = false; reason = 'denylisted'; break; } } }\nreturn [{ json: { input: raw, allowed, reason } }];"
+      },
+      "id": "22222222-2222-4222-8222-222222222222",
+      "name": "Guard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-allowed",
+              "leftValue": "={{ $json.allowed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "33333333-3333-4333-8333-333333333333",
+      "name": "Allowed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// G1 no-shell execution (execFile argv) + G3 sandbox cwd + G4 scrubbed env / least-priv\n// + G5 timeout & output cap + secret redaction.\n// PREREQ (deploy/B-3): n8n env NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs\nconst { execFileSync } = require('child_process');\nconst os = require('os');\nconst path = require('path');\nconst fs = require('fs');\nconst input = $input.first().json.input;\nconst sandbox = path.join(os.homedir(), '.n8n-claude-bridge', 'sandbox');\nfs.mkdirSync(sandbox, { recursive: true });\nconst env = { PATH: process.env.PATH, HOME: sandbox, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '' };\nlet out;\ntry {\n  out = execFileSync('claude', ['-p', input, '--permission-mode', 'plan'], { cwd: sandbox, env, timeout: 60000, maxBuffer: 1048576, encoding: 'utf8' });\n} catch (e) {\n  out = e && e.killed ? '[the assistant timed out]' : '[error running the assistant]';\n}\nout = String(out).replace(/sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{8,}|AKIA[0-9A-Z]{12,}|-----BEGIN[\\s\\S]*?-----END[^-]*-----/g, '[redacted]');\nif (out.length > 4000) out = out.slice(0, 4000) + '…';\nreturn [{ json: { output: out } }];"
+      },
+      "id": "44444444-4444-4444-8444-444444444444",
+      "name": "Run Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, -100],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-refuse",
+              "name": "output",
+              "value": "Sorry — I can't process that request.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "55555555-5555-4555-8555-555555555555",
+      "name": "Refuse",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 120]
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [[{ "node": "Guard", "type": "main", "index": 0 }]]
+    },
+    "Guard": {
+      "main": [[{ "node": "Allowed?", "type": "main", "index": 0 }]]
+    },
+    "Allowed?": {
+      "main": [
+        [{ "node": "Run Claude", "type": "main", "index": 0 }],
+        [{ "node": "Refuse", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

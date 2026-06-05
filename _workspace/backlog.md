@@ -57,8 +57,15 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         auth, G7 SAFE-mode off-by-default. Carved the spec out of `.gitignore` (`.claude/specs/*` +
         negation) so it's tracked. Verify: `git diff --check` clean · mermaid balanced · all G/T
         present · tracked-eligible.
-- [ ] B-2: Author + `validate_workflow` the bridge via `n8n:workflow-ops` + the n8n MCP server; write
+- [x] B-2: Author + `validate_workflow` the bridge via `n8n:workflow-ops` + the n8n MCP server; write
       the validated JSON to `_workspace/wf/claude-n8n-chat-bridge.json`. Do not deploy (SAFE).
+      - 2026-06-05: authored 5-node graph (Chat Trigger 1.4 → Guard code → Allowed? if 2.3 →
+        Run Claude code / Refuse set 3.4) → `_workspace/wf/claude-n8n-chat-bridge.json`. Nodes grounded
+        via n8n-mcp (offline); `validate_workflow` runtime profile = **valid, 0 errors**. Key finding:
+        Code node is sandboxed — secure `execFile` path needs instance env
+        `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs` (recorded as a B-3 gate in the spec §7).
+        Carved wf JSON out of `.gitignore`. Not deployed (SAFE). Verify: validate valid · JSON parses ·
+        tracked-eligible.
 - [ ] B-3: **(APPLY)** Deploy the bridge to the local n8n and smoke a chat round-trip
       (chat in → claude responds) via the n8n MCP server.
 

@@ -127,23 +127,41 @@ flowchart LR
 
 ## 6. Acceptance criteria
 - [ ] B-1: this spec exists, guardrails G1–G7 defined, threat model T1–T6 mapped to gates. ✅ (this file)
-- [ ] B-2: workflow JSON authored via n8n MCP, nodes grounded (`get_node_types`), `validate_workflow`
-      passes, written to `_workspace/wf/claude-n8n-chat-bridge.json`, **not deployed**. Guard uses a
-      Code node with `execFile` (no shell interpolation); claude invoked with `--permission-mode plan`
-      and scrubbed env.
+- [x] B-2: workflow JSON authored via n8n MCP, nodes grounded (`get_node`), `validate_workflow`
+      passes (valid, 0 errors), written to `_workspace/wf/claude-n8n-chat-bridge.json`, **not deployed**.
+      Guard uses a Code node with `execFile` (no shell interpolation); claude invoked with
+      `--permission-mode plan` and scrubbed env. (See §7 for the `NODE_FUNCTION_ALLOW_BUILTIN` prereq.)
 - [ ] B-3 (APPLY): deployed to local n8n, Chat Trigger auth set, smoke a benign round-trip
       ("hello" → a claude reply), then confirm an injection attempt (`; cat .env`) is **rejected by the
       guard / inert under execFile**. Only with `apply_mode=1`.
 
-## 7. Open questions (resolve in B-2/B-3)
-- Does the installed Claude Code build support `--permission-mode plan` headless, or is an
-  `--allowedTools` allowlist the right least-privilege lever? (grounded against the actual CLI in B-2)
-- Chat response node: is `Respond to Chat` a discrete node in this n8n version, or is the reply the
-  last node's output? (confirm via `search_nodes` in B-2)
-- Auth: reuse an existing n8n credential type for the Chat Trigger, or a header-token check in the
-  guard? (decide in B-2)
+## 7. B-2 findings (grounded via n8n MCP; resolved/raised open questions)
+- **Nodes grounded:** Chat Trigger = `@n8n/n8n-nodes-langchain.chatTrigger` **typeVersion 1.4**;
+  Guard/Run = `n8n-nodes-base.code` **v2** (`language: javaScript`); branch = `n8n-nodes-base.if`
+  **v2.3**; refusal = `n8n-nodes-base.set` **v3.4**. `validate_workflow` (runtime profile) → **valid,
+  0 errors**. Artifact: `_workspace/wf/claude-n8n-chat-bridge.json`.
+- **⚠️ DEPLOY PREREQUISITE (B-3 gate):** n8n's **Code node runs in a sandboxed VM** — `require('child_process')`/
+  `fs`/`os` are blocked by default (validator confirms). The secure no-shell `execFile` path therefore
+  needs the instance env **`NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs`** (and the `claude`
+  binary on the n8n process `PATH` + `ANTHROPIC_API_KEY`). This is the single most important deploy
+  gate; if it is not set, B-3 must mark blocked, not weaken to shell interpolation.
+- **RESOLVED — Chat response:** this Chat Trigger version has **no discrete "Respond to Chat" node**;
+  the reply is the **last node's `output` field**. So both branches end in a node emitting `{output}`
+  (Run Claude / Refuse). No Respond node in the graph.
+- **RESOLVED — Auth (G6):** for SAFE/MVP use `public: false` (chat reachable only via n8n's
+  login-gated manual interface). For a public deployment, set `public: true` + `authentication:
+  basicAuth` with a credential. Authored as `public: false`.
+- **STILL OPEN (B-3):** confirm the installed Claude Code build honors `--permission-mode plan`
+  headless; if not, fall back to an `--allowedTools` allowlist excluding Bash/Write/Edit. Grounded
+  against the live CLI at deploy.
+- **Validator residual warnings (acknowledged, non-blocking):** Code-node `child_process` access (=the
+  env prereq above); IF `main[1]` "missing onError" (false-positive — `main[1]` is the IF *false*
+  branch, not an error output); "Code can throw" (defensive — both Code nodes set
+  `onError: continueRegularOutput`).
 
 ## Implementation TODO
 - [x] B-1 — author this spec (guardrails-first). **Done 2026-06-05.**
-- [ ] B-2 — author + validate the workflow JSON (SAFE; no deploy).
-- [ ] B-3 — (APPLY) deploy + smoke round-trip + injection-rejection check.
+- [x] B-2 — author + validate the workflow JSON (SAFE; no deploy). **Done 2026-06-05** —
+      `_workspace/wf/claude-n8n-chat-bridge.json`, `validate_workflow` valid (0 errors).
+- [ ] B-3 — (APPLY) deploy + smoke round-trip + injection-rejection check. **Blocked on
+      `NODE_FUNCTION_ALLOW_BUILTIN` instance config + APPLY mode.**

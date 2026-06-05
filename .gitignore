@@ -99,4 +99,8 @@ stryker.log
 !/_workspace/meta-inventory.md
 !/_workspace/meta-codemap.md
 !/_workspace/meta-dataflow.md
+# Epic B/C deliverables — validated workflow JSON (B-2) survives cold resume.
+# (dir-level ignore blocks re-inclusion, so un-ignore the dir then its contents.)
+!/_workspace/wf/
+!/_workspace/wf/*.json
 packages/@n8n/task-runner-python/task_runner_python.egg-info/
