@@ -142,8 +142,20 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         (D-0) is already done, so the bring-up itself is the only gap. **Unblock path:** run in a
         docker-enabled shell — the user's terminal or the `ralph-n8n.sh` runner (`claude -p` in that
         shell): `pnpm build:docker` (once) then `scripts/n8n-up.sh`. Re-grounded each resume.
-- [ ] D-2: Triage **Dependabot PR #1** (`chore(deps): Bump the uv group …` — Python uv deps under
+- [!] D-2: Triage **Dependabot PR #1** (`chore(deps): Bump the uv group …` — Python uv deps under
       `ai-workflow-builder.ee/evaluations`). Review the bump; merge if CI green, else close with reason.
+      - 2026-06-05 TRIAGED (SAFE; the merge/close itself is outward → APPLY/human). Findings:
+        - **Low risk.** 4 files: `ai-workflow-builder.ee/evaluations/programmatic/python/{pyproject,uv.lock}`
+          (pytest `9.0.1 → 9.0.3`, a patch test-dep bump) + `task-runner-python/{pyproject,uv.lock}`
+          (lock refresh). `MERGEABLE`. Python-only → JS/TS CI lanes correctly *skip*.
+        - **Why CI is red:** `check-pr-title` **fails** because Dependabot's title `chore(deps)` uses
+          scope `deps`, which is NOT in n8n's allowed scopes (API|benchmark|core|editor|\*Node) — see
+          `.github/pull_request_title_conventions.md`. Also `Required Checks` fail (aggregate) and the
+          usual non-blocking `Verify CLA` fail (same bot that didn't block #2/#3).
+        - **Recommendation (for an APPLY session / human):** safe to merge once the **title is fixed**
+          to drop the invalid scope, e.g. `chore: bump uv group (pytest 9.0.3, task-runner-python lock) (no-changelog)`.
+          Dependabot can't self-edit its title; a maintainer edits it (`gh pr edit 1 --title …`), then
+          `check-pr-title` passes and it can merge. Not done here — title edit + merge are outward (APPLY).
 - [ ] D-3: Add a CI/check that runs `validate_workflow` over the committed `_workspace/{wf,viz}/*.json`
       so the harness workflows can't silently rot. SAFE (authoring only).
 - [ ] D-4: Decide bridge activation policy: keep `ggvV5wItgjsRnwFk` **inactive** (current safe default)
