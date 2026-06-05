@@ -108,3 +108,7 @@ stryker.log
 !/_workspace/viz/MAPPING.md
 !/_workspace/viz/*.json
 packages/@n8n/task-runner-python/task_runner_python.egg-info/
+
+# Claude Code scheduler runtime state (transient)
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
