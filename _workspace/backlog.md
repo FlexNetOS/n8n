@@ -18,8 +18,12 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         skill frontmatter intact. Committed; ledger ticked. Loop machinery proven live.
 
 ## Epic A — map the entire meta codebase
-- [ ] A-1: Inventory every meta repo from `~/Desktop/meta/.meta.yaml` (name, path, remote, language,
+- [x] A-1: Inventory every meta repo from `~/Desktop/meta/.meta.yaml` (name, path, remote, language,
       `meta:true` nesting) → write `_workspace/meta-inventory.md`.
+      - 2026-06-05: wrote `_workspace/meta-inventory.md` — 51 projects, all cloned as independent
+        repos. 21 Rust / 5 JS-TS / 2 Python / ~23 docs-hub; 1 nested (`mcp_hub` meta:true); 1 path
+        override (`github_org`→`.github_org`). Verify: `git diff --check` clean · 51/51 repo names
+        present (0 missing) · count reconciled (no-digit regex had missed `n8n`).
 - [ ] A-2: Index each repo with code intelligence (`git-kb code index` / `kb_index`); record symbol
       counts + health per repo → append to `_workspace/meta-inventory.md`.
 - [ ] A-3: Extract each repo's automation surfaces (entrypoints, CLIs, schedulers/cron, queues,

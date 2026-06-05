@@ -90,4 +90,9 @@ stryker.log
 !/_workspace/HANDOFF.md
 !/_workspace/DONE
 !/_workspace/NEEDS-HUMAN
+# Epic A deliverables (the codebase map) — durable product, tracked so downstream
+# items (A-2 appends, A-3/A-4 reference) survive a cold resume.
+!/_workspace/meta-inventory.md
+!/_workspace/meta-codemap.md
+!/_workspace/meta-dataflow.md
 packages/@n8n/task-runner-python/task_runner_python.egg-info/
