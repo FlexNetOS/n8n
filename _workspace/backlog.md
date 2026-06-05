@@ -164,8 +164,18 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         rejects cyclic graphs — the C-2 failure mode). `.github/workflows/harness-workflows-validate.yml`
         runs it on PRs to develop/master touching the workflow JSONs. Verify: 4/4 committed JSON pass
         (exit 0); negative test (injected cycle + dangling ref) correctly fails (exit 1); CI YAML parses.
-- [ ] D-4: Decide bridge activation policy: keep `ggvV5wItgjsRnwFk` **inactive** (current safe default)
+- [x] D-4: Decide bridge activation policy: keep `ggvV5wItgjsRnwFk` **inactive** (current safe default)
       vs. enabling it behind chat auth (G6). A security decision — document the call; do not auto-enable.
+      - 2026-06-05 DONE (SAFE, decision doc). Decision: **keep INACTIVE** — `_workspace/D-4-bridge-
+        activation-policy.md`. Grounded on live state (`search_workflows`: `active:false`, triggerCount 0)
+        + spec gates G1–G7. Rationale: 3 residual risks make unattended/public activation unwise — (1)
+        the B-3 cred-copy puts `~/.claude/.credentials.json` in the sandbox HOME, Read-reachable even
+        under `--permission-mode plan`, and the G4 redaction shape may not catch the subscription token;
+        (2) G2 is a denylist (incomplete by nature); (3) `public:true` widens blast radius. Epic B already
+        proved the capability (B-3), so activation adds exposure without new value. Documented a 5-item
+        APPLY+human precondition checklist (cred hygiene / G6 auth / rate-limit+audit / re-confirm plan
+        mode+caps / explicit sign-off) for any future activation. The loop does NOT auto-enable. No
+        workflow mutated (SAFE). Verify: live state read not assumed · `git diff --check` clean.
 
 ## Notes / dependencies
 - Item 2 ("use the MCP server") is satisfied structurally: every runtime-affecting cycle verifies via

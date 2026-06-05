@@ -107,6 +107,8 @@ stryker.log
 !/_workspace/viz/
 !/_workspace/viz/MAPPING.md
 !/_workspace/viz/*.json
+# Epic D decision record — bridge activation policy (D-4); durable security decision.
+!/_workspace/D-4-bridge-activation-policy.md
 packages/@n8n/task-runner-python/task_runner_python.egg-info/
 
 # Claude Code scheduler runtime state (transient)
