@@ -156,8 +156,14 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
           to drop the invalid scope, e.g. `chore: bump uv group (pytest 9.0.3, task-runner-python lock) (no-changelog)`.
           Dependabot can't self-edit its title; a maintainer edits it (`gh pr edit 1 --title …`), then
           `check-pr-title` passes and it can merge. Not done here — title edit + merge are outward (APPLY).
-- [ ] D-3: Add a CI/check that runs `validate_workflow` over the committed `_workspace/{wf,viz}/*.json`
+- [x] D-3: Add a CI/check that runs `validate_workflow` over the committed `_workspace/{wf,viz}/*.json`
       so the harness workflows can't silently rot. SAFE (authoring only).
+      - 2026-06-05 DONE (SAFE authoring). `scripts/validate-harness-workflows.mjs` — dependency-free
+        Node validator (no n8n/docker): JSON parse, required fields, unique node names, node
+        type/typeVersion present, connections reference existing nodes, and **cycle detection** (n8n
+        rejects cyclic graphs — the C-2 failure mode). `.github/workflows/harness-workflows-validate.yml`
+        runs it on PRs to develop/master touching the workflow JSONs. Verify: 4/4 committed JSON pass
+        (exit 0); negative test (injected cycle + dangling ref) correctly fails (exit 1); CI YAML parses.
 - [ ] D-4: Decide bridge activation policy: keep `ggvV5wItgjsRnwFk` **inactive** (current safe default)
       vs. enabling it behind chat auth (G6). A security decision — document the call; do not auto-enable.
 

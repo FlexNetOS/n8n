@@ -1,0 +1,40 @@
+name: 'CI: Validate harness workflow JSON'
+
+# Structural lint for the n8n-loop harness's committed workflow JSON
+# (_workspace/{wf,viz}/*.json) so the source-of-truth definitions can't silently rot.
+# Dependency-free (no pnpm install / n8n / docker) — just runs the Node validator.
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - master
+    paths:
+      - '_workspace/wf/**.json'
+      - '_workspace/viz/**.json'
+      - 'scripts/validate-harness-workflows.mjs'
+      - '.github/workflows/harness-workflows-validate.yml'
+  push:
+    branches:
+      - develop
+    paths:
+      - '_workspace/wf/**.json'
+      - '_workspace/viz/**.json'
+      - 'scripts/validate-harness-workflows.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-harness-workflows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '22.22'
+      - name: Validate harness workflow JSON
+        run: node scripts/validate-harness-workflows.mjs
