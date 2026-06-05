@@ -134,10 +134,14 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
       with them. Done 2026-06-05: `n8n import:workflow` of the committed JSONs (+ stable ids) →
       `~/.n8n` now has all 4 (CLI `list:workflow` = 6 total; bridge exported with the `$env` +
       cred-injection code intact). Reproducible via `scripts/n8n-import-workflows.sh`.
-- [ ] D-1: **(APPLY, needs docker)** Bring up the dockerized n8n on :5678 mounting `~/.n8n`:
+- [!] D-1: **(APPLY, needs docker)** Bring up the dockerized n8n on :5678 mounting `~/.n8n`:
       `pnpm build:docker` (if `n8nio/n8n:local` not built) → `scripts/n8n-up.sh`. Verify `/healthz` 200
       and that all 4 workflows are present (`search_workflows`) and render. `scripts/n8n-down.sh` to stop.
-      Blocks in any session without docker.sock access → mark `- [!] blocked: needs docker-enabled shell`.
+      - 2026-06-05 blocked: this session's `docker info` → permission denied on `/var/run/docker.sock`
+        (the in-IDE agent is not in the docker group), and it's an APPLY/outward step besides. Persistence
+        (D-0) is already done, so the bring-up itself is the only gap. **Unblock path:** run in a
+        docker-enabled shell — the user's terminal or the `ralph-n8n.sh` runner (`claude -p` in that
+        shell): `pnpm build:docker` (once) then `scripts/n8n-up.sh`. Re-grounded each resume.
 - [ ] D-2: Triage **Dependabot PR #1** (`chore(deps): Bump the uv group …` — Python uv deps under
       `ai-workflow-builder.ee/evaluations`). Review the bump; merge if CI green, else close with reason.
 - [ ] D-3: Add a CI/check that runs `validate_workflow` over the committed `_workspace/{wf,viz}/*.json`
