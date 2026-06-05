@@ -10,9 +10,12 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
 > `- [!] blocked: needs APPLY` rather than acting. Run with `N8N_APPLY=1` to let it act.
 
 ## Epic 0 — harness self-test (prove the loop machinery first)
-- [ ] 0-1: Dry-run one full cycle end-to-end on a trivial no-op slice (touch a doc), exercising
+- [x] 0-1: Dry-run one full cycle end-to-end on a trivial no-op slice (touch a doc), exercising
       design→implement→verify(scoped build/lint)→commit→ledger-tick, to confirm the loop body,
       sentinels, and gitignore carve-out all work before real work starts.
+      - 2026-06-05: slice = added `skills/n8n-loop/README.md` (launch/SAFE-APPLY/state quickref).
+        Verify (doc-only: no compile target): `git diff --check` clean · runner `bash -n` clean ·
+        skill frontmatter intact. Committed; ledger ticked. Loop machinery proven live.
 
 ## Epic A — map the entire meta codebase
 - [ ] A-1: Inventory every meta repo from `~/Desktop/meta/.meta.yaml` (name, path, remote, language,
