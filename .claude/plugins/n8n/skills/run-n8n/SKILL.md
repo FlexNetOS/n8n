@@ -66,6 +66,12 @@ Summarize: run mode (initial/follow-up/partial), instance state + editor URL, wh
 
 ## Test Scenarios
 
+**Executable smoke test (end-to-end):** `scripts/smoke-test.mjs` proves the full author → validate → deploy → execute → verify loop against a running instance via the **`n8n-builtin`** MCP server. Run it after `READY`:
+```bash
+node .claude/plugins/n8n/skills/run-n8n/scripts/smoke-test.mjs --cleanup
+```
+Exit 0 = pass. Needs n8n up + MCP access enabled + `N8N_MCP_SERVER_TOKEN` in `.claude/settings.local.json`. Omit `--cleanup` to leave the workflow in place. This is the harness's happy-path regression check — a permanent `Harness Smoke Test` workflow (`Manual Trigger → Set`) was first deployed this way (id `B8kko6gh1wBf7qcu`).
+
 **Happy path — "start n8n":** Phase 0 finds no `_workspace/` → initial run. `runtime-operator` boots containers + dev server, emits `BOOTING`. `runtime-monitor` polls, both healthz 200 → `READY`, broadcasts to mesh. Orchestrator reports "n8n ready at http://localhost:5678" and the API-key handoff offer. No workflow phase (not requested).
 
 **Error path — "n8n won't come up":** `runtime-operator` boots; `runtime-monitor` sees healthz 200 but readiness stuck at 503. Monitor triages `_workspace/01_operator_boot.log`, finds containers unhealthy → emits `DEGRADED: readiness 503, postgres container unhealthy`. Orchestrator routes back to `runtime-operator` once (`services:clean` + reboot). Still failing → stop, report `DOWN` with the log tail and the matching `n8n:runtime` troubleshooting row, do not loop.

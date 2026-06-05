@@ -47,6 +47,7 @@ it does not modify it.
 | 2026-06-04 | Initial setup | agents/{runtime-operator,runtime-monitor,workflow-engineer}, skills/{run-n8n,runtime,mesh-report,workflow-ops}, `.mcp.json` (n8n-mcp) | Build harness to run n8n via weave + rtk; add n8n-mcp |
 | 2026-06-04 | First-run hardening | skills/runtime (real-Node/PATH, build-first, sqlite3 rebuild, containerless-SQLite profile, `pnpm start` stable default, `lane` HTTPS URL, troubleshooting rows), `.lane.yaml` | First `start n8n` surfaced: bun shim can't build/run n8n, repo unbuilt, sqlite3 addon missing, Docker absent. Installed real Node 22.22.3 (`~/.local/bin` symlinks shadow bun), built repo, rebuilt sqlite3, ran on SQLite; folded all into the runtime skill |
 | 2026-06-04 | Add n8n-builtin MCP surface | `.mcp.json` (n8n-builtin), skills/workflow-ops | n8n 2.25 scopes API keys by audience: `n8n-mcp`'s mgmt tools need `public-api`, but the available key was `mcp-server-api`. Wired n8n's own MCP server (`/mcp-server/http`, Bearer `${N8N_MCP_SERVER_TOKEN}` from gitignored settings.local.json) — 28 live workflow tools. Documented both surfaces |
+| 2026-06-04 | Add executable smoke test | skills/run-n8n/scripts/smoke-test.mjs, skills/run-n8n (Test Scenarios) | Proven author→validate→deploy→execute→verify loop via n8n-builtin; committed as a repeatable harness regression check. First deploy kept as workflow `B8kko6gh1wBf7qcu` |
 
 ## Essential Commands
 
