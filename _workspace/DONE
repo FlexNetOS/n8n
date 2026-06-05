@@ -1,0 +1,63 @@
+# n8n-loop DONE — 2026-06-05T07:35:05Z
+
+The backlog is **fully resolved**: every item is `- [x]` (done+verified) or `- [!]` (blocked &
+surfaced). The loop terminates here — no re-fire. Two `(APPLY)` items are deferred for a human
+(SAFE mode never performs outward/irreversible actions).
+
+## Tally
+- **9 done** · **2 blocked (APPLY, surfaced)** · **0 todo**
+- `cycles_total = 11` across 5 sessions (1 self-test + 4 work sessions, budget 3/session).
+
+## What the loop produced (all committed; deliverables tracked via .gitignore carve-outs)
+**Epic 0 — harness self-test**
+- 0-1 — proved the loop body + sentinels + carve-out (commit b7ace30d32).
+
+**Epic A — map the entire meta codebase** ✅ complete
+- A-1 inventory of all 51 repos → `_workspace/meta-inventory.md` (f86cfaf535)
+- A-2 code-intel index, 207,954 symbols / 42 code repos → A-2 table in same file (f3befae71f)
+- A-3 automation surfaces → `_workspace/meta-codemap.md` (8a66b817dc)
+- A-4 cross-repo data-flow (3 mermaid views) → `_workspace/meta-dataflow.md` (a7d54f0313)
+
+**Epic B — Claude Code CLI ↔ n8n chat bridge** (design+build done; deploy → human)
+- B-1 guardrails-first spec → `.claude/specs/claude-n8n-chat-bridge.md` (3fed901409)
+- B-2 authored + validated bridge workflow → `_workspace/wf/claude-n8n-chat-bridge.json` (8237f8aabd)
+- **B-3 `[!]` blocked (APPLY)** — deploy bridge + smoke chat round-trip (dda9780acc)
+
+**Epic C — visualize code/data-flow in n8n** (design+build done; deploy → human)
+- C-1 code→n8n visualization mapping → `_workspace/viz/MAPPING.md` (22b5f6fd87)
+- C-2 3 validated master viz workflows → `_workspace/viz/0{1,2,3}-*.json` (517b02ae6b)
+- **C-3 `[!]` blocked (APPLY)** — deploy viz workflows + verify render (this session)
+
+## Gate evidence
+- **No n8n source was modified** — every cycle produced docs / specs / validated workflow JSON, so
+  no package `pnpm build`/`pnpm test`/lint was applicable (nothing to compile). The per-cycle gate was
+  instead: `git diff --check` clean on every doc, and `validate_workflow` on every workflow.
+- **All 4 authored workflows validate clean** (n8n-mcp `validate_workflow`, runtime profile, 0 errors):
+  - `wf/claude-n8n-chat-bridge.json` — valid (Code-node `child_process` warning = the documented
+    `NODE_FUNCTION_ALLOW_BUILTIN` deploy prereq, not a defect).
+  - `viz/01-build-spine.json`, `viz/02-runtime-dataflow.json`, `viz/03-n8n-execution.json` — valid
+    (only the expected "no trigger" warning; these are inert diagrams).
+- **No runtime smoke was required** — nothing was deployed (SAFE); n8n was not booted this run.
+- Backlog fully `- [x]`/`- [!]`; both `- [!]` items surfaced below.
+
+## ⛔ Blocked (APPLY) — what a human must do to finish
+Both are outward/irreversible deploys that SAFE mode refuses. The validated artifacts are ready.
+
+1. **B-3 — deploy the Claude↔n8n chat bridge.** Prereqs:
+   - `N8N_APPLY=1` (APPLY mode) **and** a running local n8n (container profile, n8n MCP surfaces up —
+     boot via `n8n:run-n8n`).
+   - Instance env **`NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs`** (the bridge's secure
+     `execFile` Code node is sandboxed without it — see spec §7), plus `claude` on the n8n process
+     PATH and `ANTHROPIC_API_KEY`.
+   - Then deploy `_workspace/wf/claude-n8n-chat-bridge.json` via the n8n MCP server; smoke a benign
+     chat round-trip, and confirm an injection attempt (`; cat .env`) is rejected/inert.
+
+2. **C-3 — deploy the 3 visualization workflows.** Prereqs: `N8N_APPLY=1` + running n8n. Import each
+   of `_workspace/viz/0{1,2,3}-*.json` via the n8n MCP server and confirm each renders the data flow.
+
+## How to finish (human, one command path)
+Boot n8n (`n8n:run-n8n`), set the env prereq for B-3, then re-run the loop in APPLY:
+`N8N_APPLY=1` → `/n8n-loop resume` (or the `ralph-n8n.sh` runner with `N8N_APPLY=1`). With the gates
+met, B-3 and C-3 become actionable; the loop will deploy + smoke them and tick them `- [x]`.
+
+— end —

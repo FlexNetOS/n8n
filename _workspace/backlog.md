@@ -95,8 +95,14 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         0 errors** (only expected no-trigger warning). Finding: n8n rejects cycles — broke the Ralph
         back-edge + meta↔meta-mcp 2-cycle via node annotations (updated MAPPING §3). SAFE: validated,
         not deployed. Verify: 3/3 validate valid · JSON parses · acyclic · tracked-eligible.
-- [ ] C-3: **(APPLY)** Deploy the visualization workflows to the local n8n; verify each renders and
+- [!] C-3: **(APPLY)** Deploy the visualization workflows to the local n8n; verify each renders and
       reflects the real data flow.
+      - 2026-06-05 blocked (SAFE refusal of outward/irreversible action). Two unmet gates for a human:
+        (1) **APPLY mode** (`N8N_APPLY=1`); (2) **running n8n** on the container profile with the
+        n8n MCP surfaces (down at handoff; boot via `n8n:run-n8n`). The 3 validated viz workflows
+        (`_workspace/viz/0{1,2,3}-*.json`, C-2) are ready to deploy as-is — only the outward push is
+        deferred. To finish: with n8n up + `N8N_APPLY=1`, import each JSON via the n8n MCP server and
+        confirm it renders. Surfaced for a human in `_workspace/DONE`.
 
 ## Notes / dependencies
 - Item 2 ("use the MCP server") is satisfied structurally: every runtime-affecting cycle verifies via
