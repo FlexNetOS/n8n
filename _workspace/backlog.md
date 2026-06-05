@@ -46,10 +46,17 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         clean · 3/3 mermaid blocks fence-balanced + subgraph/end matched. **Epic A COMPLETE.**
 
 ## Epic B — Claude Code CLI ↔ n8n chat bridge
-- [ ] B-1: Spec (`n8n:spec-driven-development` → `.claude/specs/claude-n8n-chat-bridge.md`): an n8n
+- [x] B-1: Spec (`n8n:spec-driven-development` → `.claude/specs/claude-n8n-chat-bridge.md`): an n8n
       workflow `Chat Trigger → (guard) → Execute Command (claude -p "{{chatInput}}") → Respond`.
       Design the **security guardrails first**: input allowlist/escaping (no shell injection),
       working-dir confinement, timeout, and that it is OFF/non-deployed in SAFE mode.
+      - 2026-06-05: wrote `.claude/specs/claude-n8n-chat-bridge.md` (guardrails-first). Threat model
+        T1–T6 → gates G1–G7: G1 no shell interpolation (Code node + `execFile` argv, not Execute
+        Command), G2 input allowlist/denylist (fail-closed), G3 sandbox-cwd confinement, G4 scrubbed
+        env + least-priv `--permission-mode plan` + secret-redaction, G5 timeout/output cap, G6 chat
+        auth, G7 SAFE-mode off-by-default. Carved the spec out of `.gitignore` (`.claude/specs/*` +
+        negation) so it's tracked. Verify: `git diff --check` clean · mermaid balanced · all G/T
+        present · tracked-eligible.
 - [ ] B-2: Author + `validate_workflow` the bridge via `n8n:workflow-ops` + the n8n MCP server; write
       the validated JSON to `_workspace/wf/claude-n8n-chat-bridge.json`. Do not deploy (SAFE).
 - [ ] B-3: **(APPLY)** Deploy the bridge to the local n8n and smoke a chat round-trip

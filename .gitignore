@@ -69,7 +69,11 @@ packages/cli/src/commands/export/outputs
 .claude/settings.local.json
 .claude/plans/
 .claude/worktrees/
-.claude/specs/
+.claude/specs/*
+# n8n-loop harness spec deliverables — durable, tracked so a cold resume sees them.
+# (ignore specs/ contents, but force-track harness specs; dir-level ignore would
+# block re-inclusion, so this uses specs/* + negation.)
+!.claude/specs/claude-n8n-chat-bridge.md
 .cursor/plans/
 .superset
 .conductor
