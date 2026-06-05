@@ -38,8 +38,12 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         n8n ScheduleTrigger); queues (n8n scaling: Bull/Redis/multi-main); webhooks (n8n live/test/
         waiting); weave mesh (libSQL broker). Verify: `git diff --check` clean · all 7 cited source
         paths exist on disk.
-- [ ] A-4: Synthesize the cross-repo data-flow map (how repos connect: meta CLI ↔ plugins ↔ loop_lib,
+- [x] A-4: Synthesize the cross-repo data-flow map (how repos connect: meta CLI ↔ plugins ↔ loop_lib,
       the weave mesh, n8n, harness_hub) as a mermaid diagram → `_workspace/meta-dataflow.md`.
+      - 2026-06-05: wrote `_workspace/meta-dataflow.md` — 3 mermaid views (build/dependency spine,
+        runtime automation data-flow, n8n internal execution) + connection legend grounded in A-1/A-2/
+        A-3. Synthesized from the committed map files (no re-indexing). Verify: `git diff --check`
+        clean · 3/3 mermaid blocks fence-balanced + subgraph/end matched. **Epic A COMPLETE.**
 
 ## Epic B — Claude Code CLI ↔ n8n chat bridge
 - [ ] B-1: Spec (`n8n:spec-driven-development` → `.claude/specs/claude-n8n-chat-bridge.md`): an n8n
