@@ -10,7 +10,10 @@
       "name": "Chat Trigger",
       "type": "@n8n/n8n-nodes-langchain.chatTrigger",
       "typeVersion": 1.4,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -21,7 +24,10 @@
       "name": "Guard",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0],
+      "position": [
+        220,
+        0
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -53,18 +59,24 @@
       "name": "Allowed?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
         "language": "javaScript",
-        "jsCode": "// G1 no-shell execution (execFile argv) + G3 sandbox cwd + G4 scrubbed env / least-priv\n// + G5 timeout & output cap + secret redaction.\n// PREREQ (deploy/B-3): n8n env NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs\nconst { execFileSync } = require('child_process');\nconst os = require('os');\nconst path = require('path');\nconst fs = require('fs');\nconst input = $input.first().json.input;\nconst sandbox = path.join(os.homedir(), '.n8n-claude-bridge', 'sandbox');\nfs.mkdirSync(sandbox, { recursive: true });\nconst env = { PATH: process.env.PATH, HOME: sandbox, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '' };\nlet out;\ntry {\n  out = execFileSync('claude', ['-p', input, '--permission-mode', 'plan'], { cwd: sandbox, env, timeout: 60000, maxBuffer: 1048576, encoding: 'utf8' });\n} catch (e) {\n  out = e && e.killed ? '[the assistant timed out]' : '[error running the assistant]';\n}\nout = String(out).replace(/sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{8,}|AKIA[0-9A-Z]{12,}|-----BEGIN[\\s\\S]*?-----END[^-]*-----/g, '[redacted]');\nif (out.length > 4000) out = out.slice(0, 4000) + '…';\nreturn [{ json: { output: out } }];"
+        "jsCode": "// G1 no-shell execution (execFile argv) + G3 sandbox cwd + G4 least-priv + G5 timeout/cap + redaction.\n// PREREQ: n8n instance env NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs\n// Auth (user-approved trade-off, 2026-06-05): copy ONLY ~/.claude/.credentials.json into the sandbox\n// HOME so claude can auth via the subscription login, while filesystem access stays confined to the\n// sandbox (G3 preserved — no ~/.ssh / real-home exposure).\nconst { execFileSync } = require('child_process');\nconst os = require('os');\nconst path = require('path');\nconst fs = require('fs');\nconst input = $input.first().json.input;\nconst realHome = os.homedir();\nconst sandbox = path.join(realHome, '.n8n-claude-bridge', 'sandbox');\nfs.mkdirSync(sandbox, { recursive: true });\ntry {\n  const credDir = path.join(sandbox, '.claude');\n  fs.mkdirSync(credDir, { recursive: true });\n  fs.copyFileSync(path.join(realHome, '.claude', '.credentials.json'), path.join(credDir, '.credentials.json'));\n} catch (e) { /* missing creds -> claude fails to auth; surfaced in output */ }\nconst env = { PATH: process.env.PATH, HOME: sandbox };\nif (process.env.ANTHROPIC_API_KEY) env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;\nlet out;\ntry {\n  out = execFileSync('claude', ['-p', input, '--permission-mode', 'plan'], { cwd: sandbox, env, timeout: 60000, maxBuffer: 1048576, encoding: 'utf8' });\n} catch (e) {\n  out = (e && e.killed) ? '[the assistant timed out]' : ('[error running the assistant] ' + (e && e.message ? String(e.message).slice(0, 200) : ''));\n}\nout = String(out).replace(/sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{8,}|AKIA[0-9A-Z]{12,}|-----BEGIN[\\s\\S]*?-----END[^-]*-----/g, '[redacted]');\nif (out.length > 4000) out = out.slice(0, 4000) + '…';\nreturn [{ json: { output: out } }];"
       },
       "id": "44444444-4444-4444-8444-444444444444",
       "name": "Run Claude",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, -100],
+      "position": [
+        660,
+        -100
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -86,20 +98,51 @@
       "name": "Refuse",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [660, 120]
+      "position": [
+        660,
+        120
+      ]
     }
   ],
   "connections": {
     "Chat Trigger": {
-      "main": [[{ "node": "Guard", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Guard": {
-      "main": [[{ "node": "Allowed?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Allowed?": {
       "main": [
-        [{ "node": "Run Claude", "type": "main", "index": 0 }],
-        [{ "node": "Refuse", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Run Claude",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Refuse",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
