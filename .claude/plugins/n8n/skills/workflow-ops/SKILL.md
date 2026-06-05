@@ -3,9 +3,22 @@ name: n8n:workflow-ops
 description: How to build, validate, and deploy n8n workflows through the n8n-mcp MCP server (7 core + 13 management tools). ALWAYS use when authoring a workflow, validating a workflow JSON, deploying/running a workflow on the local n8n, or searching n8n node docs. Triggers on "build a workflow", "validate this workflow", "deploy the workflow", "n8n node docs", "what nodes do X", "push workflow to n8n".
 ---
 
-# n8n Workflow Ops — via n8n-mcp
+# n8n Workflow Ops — two MCP surfaces
 
-The `workflow-engineer` agent uses this. n8n-mcp is the **agent interface** to n8n; the running n8n is the **engine**. Wired in `.mcp.json` as `n8n-mcp` (stdio via `npx n8n-mcp`, canonical from `meta/mcp_hub`).
+The `workflow-engineer` agent uses this. There are **two** complementary n8n MCP servers wired in `.mcp.json`; pick by task:
+
+| Server | Auth | Best for | Tool names |
+|--------|------|----------|------------|
+| **`n8n-mcp`** (external, `npx`, from `meta/mcp_hub`) | none for core | **authoring** — node docs, search, validation, templates | `search_nodes`, `get_node`, `validate_workflow`, `tools_documentation`, … |
+| **`n8n-builtin`** (n8n's OWN MCP server at `/mcp-server/http`) | **`mcp-server-api` key** via `Bearer ${N8N_MCP_SERVER_TOKEN}` | **live management** — build/deploy/run against the running instance | `create_workflow_from_code`, `update_workflow`, `publish_workflow`, `execute_workflow`, `test_workflow`, `search_workflows`, `get_execution`, `validate_workflow`, `list_credentials`, data-tables, `get_sdk_reference`, … (28 tools) |
+
+**Two key types — don't confuse them (n8n ≥2.25):**
+- `n8n-builtin` (n8n's MCP server) takes an **`aud: mcp-server-api`** key as a Bearer token → this is what's wired and working.
+- `n8n-mcp`'s 13 *management* tools (`n8n_*`) would take an **`aud: public-api`** key in `N8N_API_KEY` (public REST API). Without it, `n8n-mcp` is docs-only — which is fine, because **live management goes through `n8n-builtin`** instead.
+
+**Default path:** author + validate with `n8n-mcp` (rich node docs), then build/deploy/run on the live instance with `n8n-builtin` (uses the SDK — start from its `get_sdk_reference` and `create_workflow_from_code`). Both require n8n running; `n8n-builtin` also needs MCP access enabled (Settings → MCP) and the token in `.claude/settings.local.json` (gitignored).
+
+## n8n-mcp tiers (authoring server)
 
 ## Two tiers of tools
 

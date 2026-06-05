@@ -1,5 +1,5 @@
 {
-  "_comment": "Canonical wiring from meta/mcp_hub (snippets/n8n-mcp.mcp.json). Docs-only mode: the 7 core tools (node docs, search, validation, templates) work with no credentials. N8N_API_URL is pre-pointed at the local dev instance; add N8N_API_KEY to unlock the 13 management tools. Per the run-n8n harness, the key is obtained from the n8n UI on first launch and cataloged through weave — do NOT commit a key here (public repo).",
+  "_comment": "Two n8n MCP surfaces. (1) n8n-mcp: external tool (npx), node docs/search/validation — 7 core tools need no creds; its 13 mgmt tools would need a PUBLIC-API key in N8N_API_KEY (aud=public-api). (2) n8n-builtin: n8n's OWN MCP server at /mcp-server/http, authenticated with an MCP-SERVER key (aud=mcp-server-api) via Bearer; the token is read from ${N8N_MCP_SERVER_TOKEN} (set in the gitignored .claude/settings.local.json — never commit it here, public repo). Requires n8n running + MCP access enabled (Settings → MCP).",
   "mcpServers": {
     "n8n-mcp": {
       "command": "npx",
@@ -9,6 +9,13 @@
         "LOG_LEVEL": "error",
         "DISABLE_CONSOLE_OUTPUT": "true",
         "N8N_API_URL": "http://localhost:5678"
+      }
+    },
+    "n8n-builtin": {
+      "type": "http",
+      "url": "http://localhost:5678/mcp-server/http",
+      "headers": {
+        "Authorization": "Bearer ${N8N_MCP_SERVER_TOKEN}"
       }
     }
   }
