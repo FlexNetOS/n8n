@@ -69,7 +69,11 @@ packages/cli/src/commands/export/outputs
 .claude/settings.local.json
 .claude/plans/
 .claude/worktrees/
-.claude/specs/
+.claude/specs/*
+# n8n-loop harness spec deliverables — durable, tracked so a cold resume sees them.
+# (ignore specs/ contents, but force-track harness specs; dir-level ignore would
+# block re-inclusion, so this uses specs/* + negation.)
+!.claude/specs/claude-n8n-chat-bridge.md
 .cursor/plans/
 .superset
 .conductor
@@ -90,4 +94,21 @@ stryker.log
 !/_workspace/HANDOFF.md
 !/_workspace/DONE
 !/_workspace/NEEDS-HUMAN
+# Epic A deliverables (the codebase map) — durable product, tracked so downstream
+# items (A-2 appends, A-3/A-4 reference) survive a cold resume.
+!/_workspace/meta-inventory.md
+!/_workspace/meta-codemap.md
+!/_workspace/meta-dataflow.md
+# Epic B/C deliverables — validated workflow JSON (B-2) survives cold resume.
+# (dir-level ignore blocks re-inclusion, so un-ignore the dir then its contents.)
+!/_workspace/wf/
+!/_workspace/wf/*.json
+# Epic C visualization deliverables — mapping (C-1) + validated viz workflows (C-2).
+!/_workspace/viz/
+!/_workspace/viz/MAPPING.md
+!/_workspace/viz/*.json
 packages/@n8n/task-runner-python/task_runner_python.egg-info/
+
+# Claude Code scheduler runtime state (transient)
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json

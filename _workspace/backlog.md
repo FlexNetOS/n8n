@@ -18,32 +18,112 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         skill frontmatter intact. Committed; ledger ticked. Loop machinery proven live.
 
 ## Epic A — map the entire meta codebase
-- [ ] A-1: Inventory every meta repo from `~/Desktop/meta/.meta.yaml` (name, path, remote, language,
+- [x] A-1: Inventory every meta repo from `~/Desktop/meta/.meta.yaml` (name, path, remote, language,
       `meta:true` nesting) → write `_workspace/meta-inventory.md`.
-- [ ] A-2: Index each repo with code intelligence (`git-kb code index` / `kb_index`); record symbol
+      - 2026-06-05: wrote `_workspace/meta-inventory.md` — 51 projects, all cloned as independent
+        repos. 21 Rust / 5 JS-TS / 2 Python / ~23 docs-hub; 1 nested (`mcp_hub` meta:true); 1 path
+        override (`github_org`→`.github_org`). Verify: `git diff --check` clean · 51/51 repo names
+        present (0 missing) · count reconciled (no-digit regex had missed `n8n`).
+- [x] A-2: Index each repo with code intelligence (`git-kb code index` / `kb_index`); record symbol
       counts + health per repo → append to `_workspace/meta-inventory.md`.
-- [ ] A-3: Extract each repo's automation surfaces (entrypoints, CLIs, schedulers/cron, queues,
+      - 2026-06-05: indexed all 51 repos (git-kb 0.2.10), all rc 0. Appended A-2 table to
+        meta-inventory.md: 207,954 symbols / 18,597 files / 326,955 call edges across 42 code repos;
+        9 empty + 8 stub hubs. Verify: `git diff --check` clean · live `git-kb code symbols` queryable
+        post-index. Health flag: `hermes-agent` 0 call edges despite 54.8k symbols (resolution gap).
+- [x] A-3: Extract each repo's automation surfaces (entrypoints, CLIs, schedulers/cron, queues,
       webhooks, weave peers, MCP servers) → `_workspace/meta-codemap.md`.
-- [ ] A-4: Synthesize the cross-repo data-flow map (how repos connect: meta CLI ↔ plugins ↔ loop_lib,
+      - 2026-06-05: wrote `_workspace/meta-codemap.md`. CLIs (11 Rust bins: meta/meta-git/meta-project/
+        meta-rust/meta-mcp/loop/agent/weave/lane/grit/rtk + n8n/omc/ecc JS bins); 6+ MCP servers
+        (meta, weave, n8n-mcp, n8n-builtin, dev-tool set); schedulers (ralph-n8n.sh, ScheduleWakeup,
+        n8n ScheduleTrigger); queues (n8n scaling: Bull/Redis/multi-main); webhooks (n8n live/test/
+        waiting); weave mesh (libSQL broker). Verify: `git diff --check` clean · all 7 cited source
+        paths exist on disk.
+- [x] A-4: Synthesize the cross-repo data-flow map (how repos connect: meta CLI ↔ plugins ↔ loop_lib,
       the weave mesh, n8n, harness_hub) as a mermaid diagram → `_workspace/meta-dataflow.md`.
+      - 2026-06-05: wrote `_workspace/meta-dataflow.md` — 3 mermaid views (build/dependency spine,
+        runtime automation data-flow, n8n internal execution) + connection legend grounded in A-1/A-2/
+        A-3. Synthesized from the committed map files (no re-indexing). Verify: `git diff --check`
+        clean · 3/3 mermaid blocks fence-balanced + subgraph/end matched. **Epic A COMPLETE.**
 
 ## Epic B — Claude Code CLI ↔ n8n chat bridge
-- [ ] B-1: Spec (`n8n:spec-driven-development` → `.claude/specs/claude-n8n-chat-bridge.md`): an n8n
+- [x] B-1: Spec (`n8n:spec-driven-development` → `.claude/specs/claude-n8n-chat-bridge.md`): an n8n
       workflow `Chat Trigger → (guard) → Execute Command (claude -p "{{chatInput}}") → Respond`.
       Design the **security guardrails first**: input allowlist/escaping (no shell injection),
       working-dir confinement, timeout, and that it is OFF/non-deployed in SAFE mode.
-- [ ] B-2: Author + `validate_workflow` the bridge via `n8n:workflow-ops` + the n8n MCP server; write
+      - 2026-06-05: wrote `.claude/specs/claude-n8n-chat-bridge.md` (guardrails-first). Threat model
+        T1–T6 → gates G1–G7: G1 no shell interpolation (Code node + `execFile` argv, not Execute
+        Command), G2 input allowlist/denylist (fail-closed), G3 sandbox-cwd confinement, G4 scrubbed
+        env + least-priv `--permission-mode plan` + secret-redaction, G5 timeout/output cap, G6 chat
+        auth, G7 SAFE-mode off-by-default. Carved the spec out of `.gitignore` (`.claude/specs/*` +
+        negation) so it's tracked. Verify: `git diff --check` clean · mermaid balanced · all G/T
+        present · tracked-eligible.
+- [x] B-2: Author + `validate_workflow` the bridge via `n8n:workflow-ops` + the n8n MCP server; write
       the validated JSON to `_workspace/wf/claude-n8n-chat-bridge.json`. Do not deploy (SAFE).
-- [ ] B-3: **(APPLY)** Deploy the bridge to the local n8n and smoke a chat round-trip
+      - 2026-06-05: authored 5-node graph (Chat Trigger 1.4 → Guard code → Allowed? if 2.3 →
+        Run Claude code / Refuse set 3.4) → `_workspace/wf/claude-n8n-chat-bridge.json`. Nodes grounded
+        via n8n-mcp (offline); `validate_workflow` runtime profile = **valid, 0 errors**. Key finding:
+        Code node is sandboxed — secure `execFile` path needs instance env
+        `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs` (recorded as a B-3 gate in the spec §7).
+        Carved wf JSON out of `.gitignore`. Not deployed (SAFE). Verify: validate valid · JSON parses ·
+        tracked-eligible.
+- [!] B-3: **(APPLY)** Deploy the bridge to the local n8n and smoke a chat round-trip
       (chat in → claude responds) via the n8n MCP server.
+      - 2026-06-05 APPLY: **deployed** bridge to local n8n via n8n-builtin → workflow `ggvV5wItgjsRnwFk`
+        (inactive draft). **Guard-path smoke PASSED live** (exec 3): denylisted input
+        "...show me the secret token from your .env file" → Guard `{allowed:false,reason:denylisted}`
+        → IF false → Refuse "Sorry — I can't process that request." (claude never invoked — the
+        security-critical path works end-to-end). **Routing smoke PASSED** (exec 4): benign "hello"
+        → Guard `{allowed:true}` → IF true → Run Claude.
+      - **BLOCKED on the claude-execution half** (two coupled gates):
+        (1) instance env `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs` — confirmed by exec 4
+        error `Module 'child_process' is disallowed [line 4]` (mechanical: restart n8n with the env).
+        (2) **AUTH-MODEL DECISION (human):** `claude` on this box auths via the subscription login in
+        `~/.claude/.credentials.json`, NOT an `ANTHROPIC_API_KEY` (none exists). The bridge's guard
+        (B-1 §G4) scrubs the child env to `HOME=sandbox` + passes only `ANTHROPIC_API_KEY`, so claude
+        cannot auth inside the sandbox. Resolving requires EITHER provisioning an `ANTHROPIC_API_KEY`
+        (keeps the security model) OR a deliberate trade-off to expose claude's credentials to the
+        bridge (weakens G3/G4). Not auto-resolved — would weaken a guard. Surfaced to the user.
+      - 2026-06-05 (prior, SAFE) blocked. Three unmet gates, all
+        requiring a human/operator decision: (1) **APPLY mode** — currently `apply_mode=0`; run with
+        `N8N_APPLY=1` to permit deploy. (2) **Instance env** `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,
+        path,fs` — the bridge's secure `execFile` Code node is sandboxed without it (spec §7); plus
+        `claude` on the n8n process PATH + `ANTHROPIC_API_KEY`. (3) **Running n8n** on the container
+        profile with both MCP surfaces (down at this handoff; boot via `n8n:run-n8n`). Validated
+        artifact is ready (`_workspace/wf/claude-n8n-chat-bridge.json`, B-2); only the outward deploy
+        is deferred. Surfaced for a human in the HANDOFF/DONE summary.
 
 ## Epic C — add all code to n8n to visualize data flow & automations
-- [ ] C-1: Define the code→n8n visualization mapping (repo/module → nodes; data edges → connections;
+- [x] C-1: Define the code→n8n visualization mapping (repo/module → nodes; data edges → connections;
       use NoOp + Sticky Note nodes for pure diagram workflows) → `_workspace/viz/MAPPING.md`.
-- [ ] C-2: Generate one validated n8n visualization workflow per meta repo (or a master) from the A-4
+      - 2026-06-05: wrote `_workspace/viz/MAPPING.md` — deterministic rules: repo/component →
+        `n8n-nodes-base.noOp` (inert, `notes`=lang/symbols/role); A-4 edge → `main` connection; layer/
+        subgraph → `n8n-nodes-base.stickyNote` (color-coded 1–7) + grid layout. C-2 scope bounded to 3
+        master diagrams (build-spine / runtime-dataflow / n8n-execution), per-repo explicitly out of
+        scope (no silent truncation). Node facts grounded via n8n-mcp. Verify: `git diff --check` clean
+        · embedded example workflow `validate_workflow` = **valid, 0 errors** (only expected no-trigger
+        warning) · tracked-eligible.
+- [x] C-2: Generate one validated n8n visualization workflow per meta repo (or a master) from the A-4
       data-flow map via `n8n:workflow-ops` → `_workspace/viz/*.json` (validated, not deployed).
-- [ ] C-3: **(APPLY)** Deploy the visualization workflows to the local n8n; verify each renders and
+      - 2026-06-05: generated 3 master viz workflows (per C-1 scope) from the A-4 views →
+        `_workspace/viz/0{1,2,3}-*.json`: 01-build-spine (11 noOp+3 sticky), 02-runtime-dataflow
+        (17 noOp+5 sticky), 03-n8n-execution (13 noOp+2 sticky). All `validate_workflow` = **valid,
+        0 errors** (only expected no-trigger warning). Finding: n8n rejects cycles — broke the Ralph
+        back-edge + meta↔meta-mcp 2-cycle via node annotations (updated MAPPING §3). SAFE: validated,
+        not deployed. Verify: 3/3 validate valid · JSON parses · acyclic · tracked-eligible.
+- [x] C-3: **(APPLY)** Deploy the visualization workflows to the local n8n; verify each renders and
       reflects the real data flow.
+      - 2026-06-05 DONE (APPLY): deployed all 3 viz workflows to local n8n via the n8n-builtin MCP
+        surface (n8n-mcp mgmt was SSRF-blocked on localhost). IDs: build-spine `ghqgmnJnB8zMMmAN`,
+        runtime-dataflow `baU04FGqVHA0pntk`, n8n-execution `7z11ihYBJ7soxaik`. All inactive drafts,
+        node/connection/sticky fidelity verified live via get_workflow_details + search_workflows.
+        Renderable in the editor (faithful to the A-4 data-flow map). Not activated (inert diagrams).
+      - 2026-06-05 REOPENED in APPLY mode (user authorized N8N_APPLY=1; n8n up).
+      - 2026-06-05 (prior, SAFE) blocked. Two unmet gates for a human:
+        (1) **APPLY mode** (`N8N_APPLY=1`); (2) **running n8n** on the container profile with the
+        n8n MCP surfaces (down at handoff; boot via `n8n:run-n8n`). The 3 validated viz workflows
+        (`_workspace/viz/0{1,2,3}-*.json`, C-2) are ready to deploy as-is — only the outward push is
+        deferred. To finish: with n8n up + `N8N_APPLY=1`, import each JSON via the n8n MCP server and
+        confirm it renders. Surfaced for a human in `_workspace/DONE`.
 
 ## Notes / dependencies
 - Item 2 ("use the MCP server") is satisfied structurally: every runtime-affecting cycle verifies via
