@@ -116,8 +116,71 @@
   `meta_project_cli`, `meta_rust_cli`) + `meta_mcp`, all via `meta_plugin_protocol`. See A-3/A-4 for
   the runtime data-flow map.
 
-## Next (Epic A)
-- **A-2**: index each repo with code intelligence, record symbol counts + health → append here.
-- **A-3**: extract automation surfaces (entrypoints, CLIs, schedulers, queues, webhooks, weave peers,
-  MCP servers) → `_workspace/meta-codemap.md`.
+## Epic A progress
+- ✅ **A-1**: this inventory (above).
+- ✅ **A-2** (done 2026-06-05): code-intel index of all 51 repos — see the **A-2** table below.
+- **A-3** (next): extract automation surfaces (entrypoints, CLIs, schedulers, queues, webhooks, weave
+  peers, MCP servers) → `_workspace/meta-codemap.md`.
 - **A-4**: synthesize the cross-repo data-flow mermaid map → `_workspace/meta-dataflow.md`.
+
+## A-2 — Code-intelligence index (per repo)
+
+> Backlog item **A-2**. Indexed all 51 repos with `git-kb code index` (v0.2.10) on 2026-06-05;
+> health via `git-kb code doctor --json`. `symbols`/`files`/`edges`(call-graph edges)/`unresolved`
+> (external/unresolved call sites — high for repos heavy on third-party deps). gitignore excludes
+> `node_modules`/build dirs. All indexes returned rc 0.
+
+| repo | symbols | files | call edges | unresolved | languages |
+|------|--------:|------:|-----------:|-----------:|-----------|
+| hermes-agent | 54,834 | 2,220 | 0 | 0 | python,typescript,javascript,ruby |
+| codex | 48,670 | 2,780 | 140,149 | 233,434 | rust,python,typescript,c,javascript |
+| n8n | 48,574 | 9,163 | 79,612 | 86,370 | typescript,python,javascript |
+| oh-my-pi | 26,142 | 2,071 | 47,327 | 54,139 | typescript,rust,python,javascript |
+| oh-my-claudecode | 6,748 | 773 | 12,042 | 20,755 | typescript,javascript,python |
+| ECC | 4,677 | 372 | 15,436 | 45,936 | javascript,rust,python,typescript,swift |
+| rtk-tokenkill | 3,909 | 107 | 7,150 | 23,373 | rust,python,typescript,ruby |
+| Archon | 2,759 | 452 | 5,963 | 6,417 | typescript,javascript,ruby |
+| prompt_hub | 2,018 | 101 | 2,812 | 8,079 | rust,python |
+| obscura | 1,736 | 50 | 1,965 | 5,386 | javascript,rust |
+| icm | 1,625 | 56 | 3,967 | 11,820 | rust,typescript,python |
+| envctl | 1,342 | 72 | 3,130 | 6,365 | rust |
+| lane | 812 | 50 | 1,479 | 3,766 | rust |
+| vault_hub | 741 | 68 | 1,135 | 4,208 | rust,typescript,javascript,ruby |
+| lifeos | 572 | 58 | 404 | 1,415 | rust,javascript,typescript |
+| grit | 477 | 38 | 904 | 2,826 | rust,typescript,python |
+| meta_cli | 432 | 11 | 560 | 4,008 | rust |
+| weave | 382 | 13 | 814 | 2,421 | rust |
+| meta_git_lib | 279 | 11 | 353 | 1,788 | rust |
+| agent | 194 | 5 | 218 | 663 | rust |
+| meta_git_cli | 186 | 23 | 196 | 2,188 | rust |
+| claude-code | 182 | 21 | 396 | 1,315 | python,typescript |
+| .github_org | 151 | 21 | 243 | 736 | javascript,python |
+| obsidian-mind | 150 | 35 | 113 | 448 | typescript,javascript |
+| meta_core | 102 | 5 | 184 | 772 | rust |
+| meta_mcp | 72 | 1 | 119 | 1,016 | rust |
+| loop_lib | 60 | 2 | 67 | 917 | rust |
+| meta_project_cli | 55 | 2 | 74 | 700 | rust |
+| meta_plugin_api | 21 | 1 | 5 | 21 | rust |
+| meta_plugin_protocol | 16 | 1 | 8 | 53 | rust |
+| meta_rust_cli | 12 | 2 | 7 | 130 | rust |
+| template_hub | 4 | 2 | 22 | 54 | python |
+| loop_cli | 2 | 1 | 0 | 23 | rust |
+| flow_hub | 2 | 1 | 11 | 27 | python |
+| harness_hub | 2 | 1 | 11 | 27 | python |
+| network_hub | 2 | 1 | 11 | 27 | python |
+| tool_hub | 2 | 1 | 11 | 27 | python |
+| database_hub | 2 | 1 | 11 | 27 | python |
+| mcp_hub | 2 | 1 | 13 | 26 | python |
+| plugin_hub | 2 | 1 | 11 | 27 | python |
+| hooks_hub | 2 | 1 | 11 | 27 | python |
+| commands | 2 | 1 | 11 | 27 | python |
+| **TOTAL (42 code repos)** | **207,954** | **18,597** | **326,955** | — | — |
+
+**Empty / content-TBD repos** (0 symbols — docs/hub/new repos with no source yet): `claude-plugins`, `meta-plugins`, `flexnetos_secrets`, `flexnetos_runner`, `flexnetos_github_app`, `flexnetos_wiki`, `flexnetos_brain`, `assets`, `my-wiki`.
+
+**Health notes:**
+- **207,954 symbols** across **18,597 files** and **326,955 call-graph edges** in 42 repos.
+- Largest graphs: `n8n` (48.6k sym), `hermes-agent` (54.8k), `codex` (48.7k), `oh-my-pi` (26.1k) — the forked AI tools dwarf the meta-CLI crates.
+- `hermes-agent` shows 0 call edges despite 54.8k symbols — symbol extraction succeeded but call-graph resolution didn't (likely mixed-language / dynamic Python+TS); flag for A-3 if call data is needed there.
+- The meta-CLI spine is compact and fully resolved: `meta_cli` 432, `meta_core` 102, `meta_git_lib` 279, plugin crates <200 each — small, tractable call graphs ideal for A-3 automation-surface extraction.
+- 9 repos are empty (no source); 8 hub repos have a single stub file (~2 symbols) — content-TBD per `.meta.yaml`.

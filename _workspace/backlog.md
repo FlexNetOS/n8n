@@ -24,8 +24,12 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         repos. 21 Rust / 5 JS-TS / 2 Python / ~23 docs-hub; 1 nested (`mcp_hub` meta:true); 1 path
         override (`github_org`→`.github_org`). Verify: `git diff --check` clean · 51/51 repo names
         present (0 missing) · count reconciled (no-digit regex had missed `n8n`).
-- [ ] A-2: Index each repo with code intelligence (`git-kb code index` / `kb_index`); record symbol
+- [x] A-2: Index each repo with code intelligence (`git-kb code index` / `kb_index`); record symbol
       counts + health per repo → append to `_workspace/meta-inventory.md`.
+      - 2026-06-05: indexed all 51 repos (git-kb 0.2.10), all rc 0. Appended A-2 table to
+        meta-inventory.md: 207,954 symbols / 18,597 files / 326,955 call edges across 42 code repos;
+        9 empty + 8 stub hubs. Verify: `git diff --check` clean · live `git-kb code symbols` queryable
+        post-index. Health flag: `hermes-agent` 0 call edges despite 54.8k symbols (resolution gap).
 - [ ] A-3: Extract each repo's automation surfaces (entrypoints, CLIs, schedulers/cron, queues,
       webhooks, weave peers, MCP servers) → `_workspace/meta-codemap.md`.
 - [ ] A-4: Synthesize the cross-repo data-flow map (how repos connect: meta CLI ↔ plugins ↔ loop_lib,
