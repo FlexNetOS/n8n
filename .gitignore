@@ -77,3 +77,7 @@ packages/cli/src/commands/export/outputs
 lefthook-local.yml
 .playwright-mcp
 stryker.log
+
+# n8n runtime harness scratch (run artifacts/logs)
+_workspace/
+packages/@n8n/task-runner-python/task_runner_python.egg-info/

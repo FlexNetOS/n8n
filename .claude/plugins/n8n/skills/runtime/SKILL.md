@@ -15,26 +15,44 @@ Authoritative procedure for running a **local dev** n8n instance. The `runtime-o
 
 | Check | Command | Expected |
 |-------|---------|----------|
+| **Real Node.js** | `node --version` + `node -e "console.log(!!process.versions.bun)"` | `v22.x` and `false` (NOT bun) |
 | pnpm present | `rtk proxy pnpm --version` | `10.32.1` (installed via bun → `~/.bun/bin/pnpm`) |
-| Docker running | `rtk docker ps` | no error |
-| Port free | `rtk proxy bash -c "ss -ltn | grep 5678 || echo free"` | `free` before boot |
+| Built? | `test -d packages/cli/dist && echo built \|\| echo NOT-built` | `built` (else build first — see below) |
+| Docker | `docker ps` | optional — if absent, use the containerless/SQLite profile |
+| Port free | `rtk proxy bash -c "ss -ltn \| grep 5678 \|\| echo free"` | `free` before boot |
 
-> **Toolchain gotcha (this machine):** there is **no real Node.js** — `node` is bun's shim (reports `v24.3.0`, no REPL), and pnpm was installed through bun. Installs and `pnpm dev` run on the shim. If a step fails with zero output / silent exit, that is the shim or a lifecycle-order issue, not a missing dep — see the project memory note `n8n-toolchain-bun-shim`. A first `pnpm install` can exit 1 silently; re-running after deps land succeeds. If the dev server itself won't run on the shim, surface it clearly — a real Node ≥22.22 may be required.
+> **Toolchain reality (this machine) — already solved, keep it solved.** The base box has **no real Node.js**: bare `node` was bun's shim, which **cannot build or run n8n** (n8n's build uses `tsx`/esbuild, which fails under bun: `Cannot find module './cjs/index.cjs'`). A genuine **Node v22.22.3 is installed at `~/.local/node`**, and `node`/`npx`/`npm` are symlinked into `~/.local/bin` — which **precedes `~/.bun/bin` on PATH**, so real Node wins everywhere (Bash *and* the n8n-mcp `npx` launch) with no `~/.bashrc` edit. If `node -e "process.versions.bun"` ever prints `true` again, re-create those symlinks: `ln -sf ~/.local/node/bin/{node,npx,npm} ~/.local/bin/`. See memory `n8n-toolchain-bun-shim`. Do **not** prepend PATH inline anymore — the symlinks make it global.
+
+> **Build before run (fresh checkout).** n8n must be **built** before `start`/`dev` works — foundational packages (`@n8n/di`, `@n8n/constants`, `@n8n/backend-common`, `packages/cli`) need `dist/`. Run the memory-capped build first: `rtk proxy pnpm agent:setup build` (logs to `.agent-setup/`, writes `summary.json`). If it fails at `@n8n/n8n-nodes-langchain` with a missing `node_sqlite3.node`, rebuild the native addon: `pnpm rebuild sqlite3` (needs python3/make/g++ — present), then re-run the build (turbo caches the rest). Running `pnpm dev` without a build thrashes with ~1800 "Cannot find module '@n8n/di'" errors.
 
 ## Boot order
 
-```bash
-# 1. Service containers (postgres, redis, mailpit, proxy) — datastores FIRST
-rtk proxy pnpm --filter n8n-containers services --services postgres,redis,mailpit,proxy
+Two profiles. Pick by whether Docker is available:
 
-# 2. n8n dev server (turbo, parallel, hot reload) — BACKGROUND it, log to file
-#    run_in_background: true  +  redirect to a log
-rtk proxy pnpm dev > /tmp/n8n-dev.log 2>&1
+**A. Full stack (Docker present)** — postgres/redis/mailpit/proxy, then n8n:
+```bash
+# 1. Service containers — datastores FIRST
+rtk proxy pnpm --filter n8n-containers services --services postgres,redis,mailpit,proxy
+# 2. then start n8n (step below)
 ```
 
-- Start step 2 with the Bash tool's `run_in_background: true`. Never foreground it — it never exits.
-- Default editor: **http://localhost:5678** · REST under `/rest` · health under `/healthz`.
-- Production alternative (not default): `pnpm build` then `pnpm start`. Docker: `pnpm build:docker`.
+**B. Containerless / SQLite (Docker absent — current default on this box)** — skip containers entirely. n8n falls back to its built-in **SQLite** DB and **regular (non-queue) mode**. No external services needed.
+
+**Start n8n** (after a successful build — see "Build before run"):
+```bash
+# Stable: run the BUILT CLI (serves prebuilt editor). Preferred on low-memory boxes.
+# BACKGROUND it (run_in_background: true), redirect to a log.
+rtk proxy pnpm start > _workspace/01d_operator_start.log 2>&1
+```
+
+- Start with the Bash tool's `run_in_background: true`. Never foreground it — it never exits.
+- **`pnpm start` (built CLI) is the stable default here** — `pnpm dev` runs ~50 parallel turbo watchers (tsc + vite) and can OOM a 6 GB box; only use `dev` when the user explicitly wants hot reload, and only after a full build.
+- Default editor: **http://localhost:5678** · REST under `/rest` · health under `/healthz` · task broker on `:5679`.
+- Docker image build (heaviest): `pnpm build:docker`.
+
+## Clean HTTPS URL via `lane` (optional, nice-to-have)
+
+`lane` (installed at `~/.local/bin/lane`) fronts the local port with a trusted HTTPS domain. A `.lane.yaml` at the repo root maps `n8n.test → localhost:5678`. **First-ever `lane` run needs a one-time privileged setup** (provisions a local CA, adds it to the OS trust store, sets up 80→10080 / 443→10443 forwarding) and **prompts for a password** — so the *user* must run it in their own shell (suggest `! lane up`). Agents cannot complete it (sudo is password-gated here). After that one-time setup, `lane up` / `lane down` need no password. Check state with `lane doctor`. Until lane is set up, just use `http://localhost:5678` directly.
 
 ## Health checks (verify readiness — don't trust "process started")
 
@@ -56,11 +74,12 @@ On each transition (`booting → ready → degraded → down`), emit a status vi
 
 ## n8n-mcp API-key handoff
 
-The `n8n-mcp` server (see `.mcp.json`) works docs-only out of the box. Its 13 management tools need an n8n **API key**, created in the running UI: **Settings → n8n API → Create an API key**. Per this workspace, keys are cataloged through weave. Flow when n8n is `ready`:
+The `n8n-mcp` server (see `.mcp.json`) works docs-only out of the box. Its 13 management tools call the n8n **public REST API** (`/api/v1`), which needs an API key. Per this workspace, keys are cataloged through weave. Flow when n8n is `ready`:
 
-1. Prompt the user to create the API key in the browser UI (it only appears once).
+1. Prompt the user to create the key in **Settings → n8n API → Create an API key** (it only appears once).
+   - **Audience matters (n8n ≥2.25):** the key must have JWT `aud: "public-api"`. A key from the *MCP* settings has `aud: "mcp-server-api"` and is **rejected by `/api/v1` with 401** (n8n enforces this). Verify by decoding the JWT payload; if `aud` isn't `public-api`, it's the wrong key — have the user create one from the **n8n API** (public API) section, not an MCP section.
 2. Catalog it through weave (see `n8n:mesh-report` → "API key handoff").
-3. Make it available to n8n-mcp as `N8N_API_KEY` **without committing it** — set it in user-scope config (`~/.claude/settings.json` `mcpServers.n8n-mcp.env`) or a local env, never in the committed `.mcp.json` (public repo). `N8N_API_URL=http://localhost:5678` is already wired.
+3. Store it as `N8N_API_KEY` **without committing it** — put it in `.claude/settings.local.json` `env` (gitignored) so the n8n-mcp child process inherits it; never in the committed `.mcp.json` (public repo). `N8N_API_URL=http://localhost:5678` is already wired. The running MCP server picks up the new env on its **next launch** (restart Claude / reconnect). Quick pre-check the key against the live API: `curl -s -o /dev/null -w '%{http_code}' -H "X-N8N-API-KEY: <key>" http://localhost:5678/api/v1/workflows` should be `200`.
 
 ## Teardown
 
@@ -77,9 +96,14 @@ Emit a `down` mesh event after teardown so peers don't keep treating the instanc
 
 | Symptom | Likely cause | Action |
 |---------|--------------|--------|
+| build fails at `tsx`: `Cannot find module './cjs/index.cjs'` + `Bun vX` | bare `node` is the bun shim; tsx can't run under bun | ensure real Node wins: `ln -sf ~/.local/node/bin/{node,npx,npm} ~/.local/bin/`; verify `node -e "process.versions.bun"` is `false` |
+| build fails at `@n8n/n8n-nodes-langchain`: missing `node_sqlite3.node` | native `sqlite3` addon not compiled (installed under bun) | `pnpm rebuild sqlite3` (python3/make/g++ present), then re-run build |
+| `pnpm dev` floods ~1800 "Cannot find module '@n8n/di'" | no prior build (`dist/` missing) | stop dev; `pnpm agent:setup build` first; then `pnpm start` |
 | `pnpm` not found | not on PATH | `bun install -g pnpm@10.32.1` (see memory `n8n-toolchain-bun-shim`) |
-| `pnpm install`/dev exits 1, no output | lifecycle-order / bun-shim | re-run after deps land; `--ignore-scripts` to isolate, then `pnpm rebuild` |
+| n8n-mcp `✗ Failed to connect` | `npx` not resolving to real Node on Claude's PATH | re-create the `~/.local/bin` node symlinks; reconnect (`claude mcp list`) — may need a Claude restart |
 | Port 5678 already bound | stale n8n process | find/kill the old process, then re-boot |
-| healthz 200 but readiness never green | DB not reachable / migrations stuck | check containers healthy (`rtk docker ps`); tail `/tmp/n8n-dev.log` |
-| Containers won't start | Docker down / leftover `n8n-svc-*` | `rtk docker ps -a`; `services:clean`; retry |
+| healthz 200 but readiness never green | DB not reachable / migrations stuck | (full stack) check containers healthy; (SQLite) tail the start log |
+| "Python task runner ... virtual environment is missing" | optional Python runner venv absent | non-fatal (JS runner works); to enable: `cd packages/@n8n/task-runner-python && uv sync`, then restart n8n |
+| Docker absent / containers won't start | no Docker on this box | use the **containerless/SQLite** profile (skip the services step) |
 | n8n-mcp mgmt tools 401/no auth | missing/invalid `N8N_API_KEY` | run the API-key handoff above; until then, docs/validation only |
+| `lane`/`https://n8n.test` not resolving | one-time privileged lane setup not done | user runs `! lane up` (password prompt); verify `lane doctor`; meanwhile use `http://localhost:5678` |

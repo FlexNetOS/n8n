@@ -1,0 +1,7 @@
+# lane: clean local HTTPS domain for the n8n dev instance
+# `lane up` then open https://n8n.test  (→ localhost:5678)
+services:
+  - domain: n8n.test
+    port: 5678
+log_mode: minimal
+cors: true

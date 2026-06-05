@@ -45,6 +45,7 @@ it does not modify it.
 | Date | Change | Target | Reason |
 |------|--------|--------|--------|
 | 2026-06-04 | Initial setup | agents/{runtime-operator,runtime-monitor,workflow-engineer}, skills/{run-n8n,runtime,mesh-report,workflow-ops}, `.mcp.json` (n8n-mcp) | Build harness to run n8n via weave + rtk; add n8n-mcp |
+| 2026-06-04 | First-run hardening | skills/runtime (real-Node/PATH, build-first, sqlite3 rebuild, containerless-SQLite profile, `pnpm start` stable default, `lane` HTTPS URL, troubleshooting rows), `.lane.yaml` | First `start n8n` surfaced: bun shim can't build/run n8n, repo unbuilt, sqlite3 addon missing, Docker absent. Installed real Node 22.22.3 (`~/.local/bin` symlinks shadow bun), built repo, rebuilt sqlite3, ran on SQLite; folded all into the runtime skill |
 
 ## Essential Commands
 
