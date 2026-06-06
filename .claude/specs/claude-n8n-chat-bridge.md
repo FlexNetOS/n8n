@@ -62,6 +62,11 @@ A **Guard** step (IF/Code) runs **before** execution and **fails closed**:
 - Child process gets a **scrubbed env**: only `PATH`, `HOME`=sandbox, and the single
   `ANTHROPIC_API_KEY` (or the configured auth) — **strip everything else** (no `N8N_*`, no
   `*_TOKEN`, no `settings.local.json` contents).
+  - **Approved exception (B-3, see §7):** on this box `claude` auths via the subscription login,
+    not `ANTHROPIC_API_KEY`. The implemented Run Claude node therefore copies **only**
+    `~/.claude/.credentials.json` into the sandbox `HOME` per run. G4 is relaxed to permit that
+    single creds file; the filesystem stays confined to the sandbox (G3 intact). Nothing else
+    crosses into the child env.
 - **Tool restriction:** invoke claude with the **least-privilege** flag set. Default to a
   read-only/answer-only profile: `--permission-mode plan` (or an equivalent allowed-tools allowlist
   that excludes Bash/Write/Edit). **NEVER** `--dangerously-skip-permissions`.
@@ -118,7 +123,7 @@ flowchart LR
 | `DENYLIST` | rm -rf, /etc/, ~/.ssh, .env, secret, token, password, --dangerously, sudo, curl, wget, ssh, base64, `> /` | G2 |
 | `SANDBOX_DIR` | `~/.n8n-claude-bridge/sandbox` | G3 |
 | `CLAUDE_FLAGS` | `-p --permission-mode plan` | G4 |
-| `CHILD_ENV_ALLOW` | `PATH`, `HOME`(=sandbox), `ANTHROPIC_API_KEY` | G4 |
+| `CHILD_ENV_ALLOW` | `PATH`, `HOME`(=sandbox), `ANTHROPIC_API_KEY` · **+ copy `~/.claude/.credentials.json` → sandbox HOME** (approved exception, §7) | G4 |
 | `TIMEOUT_SEC` | 60 | G5 |
 | `MAX_OUTPUT_BYTES` | 1048576 | G5 |
 | `REPLY_TRUNCATE_CHARS` | 4000 | G5 |
