@@ -142,8 +142,11 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         (D-0) is already done, so the bring-up itself is the only gap. **Unblock path:** run in a
         docker-enabled shell — the user's terminal or the `ralph-n8n.sh` runner (`claude -p` in that
         shell): `pnpm build:docker` (once) then `scripts/n8n-up.sh`. Re-grounded each resume.
-- [!] D-2: Triage **Dependabot PR #1** (`chore(deps): Bump the uv group …` — Python uv deps under
+- [x] D-2: Triage **Dependabot PR #1** (`chore(deps): Bump the uv group …` — Python uv deps under
       `ai-workflow-builder.ee/evaluations`). Review the bump; merge if CI green, else close with reason.
+      - **RESOLVED 2026-06-05T21:19Z (APPLY):** relanded with the corrected title as **PR #8**
+        (`deps/uv-bump-reland` → develop, "chore: Bump the uv group across 2 directories with 3 updates
+        (no-changelog)") and **MERGED**. The title-scope blocker below was the fix.
       - 2026-06-05 TRIAGED (SAFE; the merge/close itself is outward → APPLY/human). Findings:
         - **Low risk.** 4 files: `ai-workflow-builder.ee/evaluations/programmatic/python/{pyproject,uv.lock}`
           (pytest `9.0.1 → 9.0.3`, a patch test-dep bump) + `task-runner-python/{pyproject,uv.lock}`
