@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "handoff.packet.n8n.v1",
+  "title": "Handoff Packet V2 — n8n variant",
+  "description": "Extends weave/handoff.handoff.packet.v2 with n8n-specific fields for workflow automation context.",
+  "type": "object",
+  "required": ["schema", "packet_id", "session_id", "task_status", "claimed_paths", "drift_report", "next_command"],
+  "properties": {
+    "schema": { "const": "handoff.packet.n8n.v1" },
+    "packet_id": { "type": "string", "pattern": "^pkt-[0-9a-f]{16}$" },
+    "session_id": { "type": "string" },
+    "task_id": { "type": ["string", "null"] },
+    "task_status": { "type": "string", "enum": ["discovered", "claimed", "implementing", "verifying", "done", "blocked"] },
+    "epic": { "type": "string" },
+    "branch": { "type": "string" },
+    "worktree": { "type": "string" },
+    "claimed_paths": { "type": "array", "items": { "type": "string" } },
+    "changed_files": { "type": "array", "items": { "type": "string" } },
+    "n8n_workflows": { "type": "array", "items": { "type": "string" }, "description": "Workflow IDs deployed during this cycle" },
+    "dataTable_id": { "type": "string", "description": "DataTable serving as ledger for this handoff" },
+    "workflow_status": { "type": "string", "enum": ["pending", "deploying", "deployed", "failed"] },
+    "node_types_used": { "type": "array", "items": { "type": "string" } },
+    "drift_report": {
+      "type": "object",
+      "required": ["status", "out_of_scope_files", "missing_evidence"],
+      "properties": {
+        "status": { "enum": ["pass", "soft_fail", "hard_fail"] },
+        "out_of_scope_files": { "type": "array", "items": { "type": "string" } },
+        "missing_evidence": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "verification_results": {
+      "type": "object",
+      "properties": {
+        "cargo_check": { "enum": ["pass", "fail", "unverified"] },
+        "bun_test": { "enum": ["pass", "fail", "unverified"] },
+        "lint": { "enum": ["pass", "fail", "unverified"] },
+        "run_n8n_smoke": { "enum": ["pass", "fail", "unverified", "skipped"] },
+        "mutant_score": { "type": ["number", "null"] }
+      }
+    },
+    "next_task_id": { "type": ["string", "null"] },
+    "next_command": { "type": "string" },
+    "automation_type": { "type": "string", "enum": ["agent", "n8n_workflow", "both"] },
+    "dependencies_met": { "type": "boolean" },
+    "apply_mode": { "type": "boolean" },
+    "safe_notes": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

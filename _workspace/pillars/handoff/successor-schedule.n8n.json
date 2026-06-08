@@ -1,0 +1,143 @@
+{
+  "name": "n8n-loop Successor Scheduling",
+  "description": "Reads the latest DataTable handoff packet, broadcasts n8n-relay:resumed via weave, and spawns a fresh successor agent session with the checkpoint prompt.",
+  "active": false,
+  "nodes": [
+    {
+      "id": "cron-trigger",
+      "name": "Cron Successor Check",
+      "type": "n8n-nodes-base.cron",
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "num": 15 }],
+          "timeZone": "UTC"
+        }
+      },
+      "position": [240, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "read-handoff",
+      "name": "Read Latest Handoff Packet",
+      "type": "@n8n/n8n-nodes-langchain.n8nDataTable",
+      "parameters": {
+        "operation": "getItems",
+        "tableName": "handoff_packets",
+        "filters": {
+          "archived": false,
+          "limit": 1,
+          "sortBy": "created_at:desc"
+        }
+      },
+      "position": [460, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "check-dirty",
+      "name": "Has Unarchived Packet?",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "condition": "json",
+        "value1": "={{ $json.length }}",
+        "operation": "greaterThan",
+        "value2": "0"
+      },
+      "position": [680, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "read-packet-data",
+      "name": "Extract Packet Data",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "=const pkt = $json[0];\nreturn {\n  json: {\n    packet_id: pkt.packet_id,\n    active_objective: pkt.active_objective,\n    current_task_id: pkt.current_task_id,\n    next_command: pkt.next_command,\n    branch: pkt.branch,\n    drift_status: pkt.drift_status\n  }\n};"
+      },
+      "position": [900, 250],
+      "typeVersion": 1
+    },
+    {
+      "id": "weave-announce",
+      "name": "Broadcast Resumed",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "{{ env('WEAVE_API_URL', 'http://localhost:8080') }}/api/send",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "=JSON.stringify({\n  to: \"all\",\n  subject: \"n8n-relay:resumed\",\n  body: `RESUMED from pkt-${$json.packet_id}, item: ${$json.current_task_id}, drift: ${$json.drift_status}`\n})"
+      },
+      "position": [1120, 350],
+      "typeVersion": 1
+    },
+    {
+      "id": "check-sentinel",
+      "name": "Check Sentinels",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "=const WS = process.env.HOME + '/Desktop/meta/n8n/_workspace';\nconst fs = require('fs');\nconst sentinels = ['DONE', 'NEEDS-HUMAN', 'STOP'];\nfor (const s of sentinels) {\n  if (fs.existsSync(WS + '/' + s)) {\n    console.log(`Stopping: sentinel ${s} present`);\n    return { json: { stop: true, reason: s } };\n  }\n}\nreturn { json: { stop: false } };"
+      },
+      "position": [1120, 450],
+      "typeVersion": 1
+    },
+    {
+      "id": "spawn-agent",
+      "name": "Spawn Successor Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "{{ env('CLAUDE_SPAWN_URL', 'http://localhost:3000') }}/v1/messages/stream",
+        "method": "POST",
+        "body": "=JSON.stringify({\n  prompt: `/n8n-loop resume from _workspace/HANDOFF.md (branch ${$json.branch}). Packet: ${$json.packet_id}. Objective: ${$json.active_objective}. Item: ${$json.current_task_id}. Verify baseline, reset counter, continue at next item.`,\n  model: process.env.N8N_LOOP_MODEL || 'opus',\n  stream: true\n})"
+      },
+      "position": [1340, 250],
+      "typeVersion": 1
+    },
+    {
+      "id": "log-event",
+      "name": "Log Session Event",
+      "type": "@n8n/n8n-nodes-langchain.n8nDataTable",
+      "parameters": {
+        "operation": "addItem",
+        "tableName": "session_events",
+        "item": "=JSON.stringify({\n  event_id: `evt-${Date.now().toString(16).padStart(16, '0').slice(-16)}`,\n  session_id: process.env.WEAVE_SESSION || 'successor-scheduler',\n  agent_id: 'successor-schedule',\n  event_type: 'session_started',\n  timestamp: new Date().toISOString(),\n  payload: JSON.stringify({ packet_id: $json.packet_id, task: $json.current_task_id })\n})"
+      },
+      "position": [1560, 250],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Cron Successor Check": {
+      "main": [[{ "node": "Read Latest Handoff Packet", "type": "main", "index": 0 }]]
+    },
+    "Read Latest Handoff Packet": {
+      "main": [[{ "node": "Has Unarchived Packet?", "type": "main", "index": 0 }]]
+    },
+    "Has Unarchived Packet?": {
+      "main": [
+        [{ "node": "Extract Packet Data", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Extract Packet Data": {
+      "main": [
+        [{ "node": "Check Sentinels", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Check Sentinels": {
+      "main": [
+        [{ "node": "Broadcast Resumed", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Broadcast Resumed": {
+      "main": [[{ "node": "Spawn Successor Agent", "type": "main", "index": 0 }]]
+    },
+    "Spawn Successor Agent": {
+      "main": [[{ "node": "Log Session Event", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

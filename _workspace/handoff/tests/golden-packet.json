@@ -1,0 +1,43 @@
+{
+  "schema": "handoff.packet.n8n.v1",
+  "packet_id": "pkt-deadbeef01234567",
+  "session_id": "verify-smoke",
+  "task_id": "A-1",
+  "task_status": "done",
+  "epic": "A-MapMetaCodebase",
+  "branch": "harness/epic-d",
+  "worktree": "/home/drdave/Desktop/meta/n8n",
+  "claimed_paths": ["_workspace/handoff/", "_workspace/pillars/", ".claude/plugins/n8n/skills/"],
+  "changed_files": [
+    "_workspace/handoff/schemas/packet-n8n.schema.json",
+    "_workspace/handoff/schemas/backlog-item.schema.json",
+    "_workspace/pillars/backlog-curator/meta-discovery.n8n.json"
+  ],
+  "n8n_workflows": [
+    "meta-discovery.n8n.json",
+    "blast-radius-analyzer.n8n.json"
+  ],
+  "dataTable_id": "handoff_packets",
+  "workflow_status": "deployed",
+  "node_types_used": ["@n8n/nodes-langchain.n8nDataTable", "n8n-nodes-base.httpRequest", "n8n-nodes-base.code"],
+  "drift_report": {
+    "status": "pass",
+    "out_of_scope_files": [],
+    "missing_evidence": []
+  },
+  "verification_results": {
+    "cargo_check": "unverified",
+    "bun_test": "pass",
+    "lint": "unverified",
+    "run_n8n_smoke": "skipped",
+    "mutant_score": null
+  },
+  "next_task_id": "A-2",
+  "next_command": "/n8n-loop resume from _workspace/HANDOFF.md (branch harness/epic-d)",
+  "automation_type": "both",
+  "dependencies_met": true,
+  "apply_mode": false,
+  "safe_notes": [
+    "Golden packet: known-good handoff checkpoint for schema validation testing"
+  ]
+}
