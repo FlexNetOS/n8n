@@ -26,6 +26,13 @@ MAX_ITERS="${RALPH_MAX_ITERS:-50}"              # hard backstop on process resta
 SLEEP_BETWEEN="${RALPH_SLEEP:-5}"               # seconds between iterations
 MODEL="${RALPH_MODEL:-opus}"
 WS="$WORKTREE/_workspace"
+HANDBASE="$WS/handoff"                           # handoff DataTable schema/ledger path
+
+# --- bun detection ---
+BUN_PATH="$(which bun 2>/dev/null || echo '')"
+if [ -z "$BUN_PATH" ]; then
+  log "WARNING: bun not found on PATH — harness scripts will use system node/npm instead"
+fi
 
 log() { printf '[ralph-n8n %s] %s\n' "$(date -u +%H:%M:%S)" "$*" >&2; }
 die() { log "FATAL: $*"; exit 1; }
@@ -53,8 +60,9 @@ read -r -d '' PROMPT <<EOF || true
    cycle counter; else DISCOVER the backlog (open issues / specs / _workspace state) and seed
    _workspace/backlog.md.
 2. Run up to $BUDGET cycles, one backlog item each: design (spec-driven-development) -> implement
-   -> VERIFY across the boundary in a FRESH shell (scoped pnpm build + affected test + lint; run-n8n
-   smoke via the n8n MCP server for runtime changes) -> commit per cycle. Outward/irreversible steps
+   -> VERIFY across the boundary in a FRESH shell (scoped bun build + affected test + bunx lint; run-n8n
+   smoke via the n8n MCP server for runtime changes; use DataTables at $HANDBASE/schema-datatable.md
+   as ledger — read handoff_packets first, fall back to HANDOFF.md file if unavailable) -> commit per cycle. Outward/irreversible steps
    (push, PRs via create-pr, deploy to a shared n8n) are fail-closed: dry-run only unless apply_mode=1.
    Never weaken a guard to make a step pass.
 3. Then write EXACTLY ONE sentinel under _workspace/ and stop (do NOT ScheduleWakeup):

@@ -15,9 +15,23 @@ not the orchestrator's: that keeps the main thread lean and is itself a token-bu
 
 ## Core role
 
-Produce `_workspace/HANDOFF.md` — a cold-start resume package. A successor that has read **only**
-this file and the committed backlog must be able to continue the loop correctly. Capture **state and
-pointers**, not narrative: where things are, what's next, what not to redo.
+Produce two synchronized checkpoints — machine-readable and human-readable:
+
+1. **`handoff_packets` DataTable row** (authoritative) — write via `@n8n-nodes-langchain.n8nDataTable` with the packet data validated against `_workspace/handoff/schemas/packet-n8n.schema.json`. This is the machine-readable ledger that any workflow or agent can query.
+2. **`_workspace/HANDOFF.md`** (readable checkpoint) — a cold-start resume package for zero-loss human/agent resume.
+
+### What to write to DataTable (packet fields)
+
+Pass these in the `n8n_manage_datatable insertRows` call:
+- `packet_id`, `schema` (use `handoff.packet.n8n.v1`), `project_name` (`n8n-loop`)
+- `active_objective`, `current_task_id`, `task_status`
+- `branch`, `changed_files` (JSON array string)
+- `drift_status`, `next_command`
+- `n8n_workflows` (JSON array string), `dataTable_id` (`handoff_packets`)
+- `execution_status`, `node_types_used` (JSON array string)
+- `created_at` (UTC ISO timestamp, you supply it)
+
+### What to write to HANDOFF.md (human-readable)
 
 ## What to capture (read the real state — don't guess)
 
