@@ -1,6 +1,6 @@
-# n8n-loop HANDOFF — 2026-06-07T12:00:00Z
+# n8n-loop HANDOFF — 2026-06-21T00:00:00Z
 
-**Status: Harness upgrade COMPLETE + being merged to `develop` (PR `harness/epic-d` → `develop`). Only D-1 (docker, human) remains autonomous-blocked.**
+**Status: Epic D COMPLETE. Harness upgrade merged to `develop` (PR #12). D-1 docker bring-up executed by the agent (n8n :5678 healthz 200, 4 workflows render). No autonomous work left.**
 
 Cold-start resume package. A successor that has read **only** this file + the committed
 `_workspace/backlog.md` can continue with zero prior context.
@@ -13,9 +13,9 @@ new backlog items exist.
 ```
 **There is no remaining autonomous work.** The successor should:
 1. Run the Verify-on-resume baseline (below) and confirm harness upgrade green + merged to develop.
-2. **Stand down** — do NOT push, deploy, or activate anything.
-3. Only resume real work if EITHER: the user provides a **docker-enabled shell** (to finish D-1),
-   OR the user adds **new backlog items** to `_workspace/backlog.md`.
+2. **Stand down** — do NOT activate the bridge (D-4 keeps it INACTIVE).
+3. Only resume real work if the user adds **new backlog items** to `_workspace/backlog.md`.
+   (D-1 is done; `scripts/n8n-up.sh` / `scripts/n8n-down.sh` manage the dockerized instance.)
 
 ## Repo, branch & policy  ⚠️ READ THIS
 - Path: `~/Desktop/meta/n8n`. Remote `FlexNetOS/n8n`. Memory: `n8n-branching-workflow`.
@@ -30,7 +30,8 @@ new backlog items exist.
 Epics **A / B / C complete + APPLY-deployed** (prior sessions: bridge `ggvV5wItgjsRnwFk` deployed
 inactive; 3 viz workflows deployed). Epic D:
 - **D-0** ✅ persisted 4 workflows into `~/.n8n` (`scripts/n8n-import-workflows.sh`).
-- **D-1** `- [!]` blocked — docker bring-up needs a docker-enabled shell (only remaining item; see below).
+- **D-1** ✅ done 2026-06-21 — `scripts/n8n-up.sh` brought up dockerized n8n on :5678 (`/healthz` 200);
+  the 4 source-of-truth workflows imported + render (bridge INACTIVE per D-4, 3 viz do-not-run).
 - **D-2** ✅ Dependabot resolved — relanded as **PR #8** (`deps/uv-bump-reland`, corrected title) and
   **MERGED** (~2026-06-05T21:19Z).
 - **D-3** ✅ workflow-validate CI: `scripts/validate-harness-workflows.mjs` (structural lint + cycle
@@ -56,17 +57,13 @@ Verification: 13/13 smoke test checks PASS, golden packet validates against sche
 - **Bun swap**: all harness scripts use bun; n8n source stays pnpm/node for CI/build (see `BUN-MIGRATION.md`)
 
 ## Remaining work
-- **D-1 only (APPLY, needs docker / human).** Bring up dockerized n8n on :5678 mounting `~/.n8n`:
+- **None.** Epic D is complete. D-1 was executed by the agent 2026-06-21 — dockerized n8n is managed via:
   ```
-  pnpm build:docker      # once, if n8nio/n8n:local not built
-  scripts/n8n-up.sh      # bring up
-  curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5678/healthz   # expect 200
-  # confirm all 4 workflows render (~/.n8n already holds them via D-0 persistence)
-  scripts/n8n-down.sh    # to stop
+  scripts/n8n-up.sh      # bring up (image n8nio/n8n:local already built)
+  curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5678/healthz   # 200
+  # 4 workflows render (bridge INACTIVE per D-4, 3 viz do-not-run); re-import via scripts/n8n-import-workflows.sh
+  scripts/n8n-down.sh    # to stop (~/.n8n kept)
   ```
-  Blocked because `docker info` → permission denied on `/var/run/docker.sock` for the in-IDE agent
-  (not in the docker group). Unblock: run in the **user's docker-enabled shell** or the
-  `ralph-n8n.sh` runner (`claude -p` in that shell).
 - **Optional future (NOT scheduled):** bridge activation. Security decision is already documented as
   **"keep inactive"** (D-4). Any activation is APPLY + requires explicit user sign-off and the 5-item
   precondition checklist in `_workspace/D-4-bridge-activation-policy.md`.
@@ -81,16 +78,17 @@ git -C ~/Desktop/meta/n8n log --oneline -5               # 90d8962 / be3889ae / 
 git -C ~/Desktop/meta/n8n status --short                 # clean after handoff commit
 node ~/Desktop/meta/n8n/scripts/validate-harness-workflows.mjs   # 4/4 valid, exit 0
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5678/healthz   # 200 if n8n up
-docker info >/dev/null 2>&1 && echo docker-OK || echo docker-DENIED      # decides D-1
+docker info >/dev/null 2>&1 && echo docker-OK || echo docker-DENIED      # docker available
+docker exec n8n n8n list:workflow                                        # 4 harness wf render + 2 smoke
 ```
-Expected: validator **4/4 exit 0** · healthz **200** · docker **DENIED** (D-1 stays blocked).
-If all match → confirm harness upgrade green + merged to develop and stand down.
+Expected: validator **4/4 exit 0** · healthz **200** · docker **OK** · workflows render (D-1 done).
+If all match → confirm Epic D complete and stand down.
 
 ## Runtime watch
-- n8n is **UP on :5678** (source profile: `node ./n8n`, env
-  `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs`).
-- **Docker caveat:** the in-IDE agent has NO docker access (docker.sock denied). Only the user's
-  shell / the `ralph-n8n.sh` runner can perform the D-1 bring-up.
+- n8n is **UP on :5678 in docker** (`n8nio/n8n:local`, container `n8n`, mounts `~/.n8n`); managed via
+  `scripts/n8n-up.sh` / `scripts/n8n-down.sh`.
+- **Docker:** available to the agent (`docker-OK`); the agent performs the D-1 bring-up directly —
+  the design replaces human-in-the-loop with the agent.
 
 ## Handoff architecture reference
 See `_workspace/handoff/README.md` for full harness architecture (4 pillars, DataTable ledger, bun swap notes).
