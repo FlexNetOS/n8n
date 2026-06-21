@@ -127,21 +127,22 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
 
 ## Epic D — productionize the live deploy (opened 2026-06-05, APPLY session)
 > Epics A/B/C are complete (incl. the live APPLY deploys). Epic D is the productionization tail.
-> SAFE-doable items can run in any session; D-1 needs **docker daemon access** — the in-IDE agent
-> lacks it (docker.sock permission denied), but the `ralph-n8n.sh` runner (a `claude -p` in the
-> user's docker-enabled shell) can do it. Persistence is already done (see D-0).
+> **Epic D is COMPLETE** — D-0..D-4 all done; D-1 docker bring-up was executed by the agent
+> 2026-06-21 (docker access is available; the design replaces human-in-the-loop with the agent).
 - [x] D-0: Persist the 4 deployed workflows into `~/.n8n` so a dockerized n8n that mounts it comes up
       with them. Done 2026-06-05: `n8n import:workflow` of the committed JSONs (+ stable ids) →
       `~/.n8n` now has all 4 (CLI `list:workflow` = 6 total; bridge exported with the `$env` +
       cred-injection code intact). Reproducible via `scripts/n8n-import-workflows.sh`.
-- [!] D-1: **(APPLY, needs docker)** Bring up the dockerized n8n on :5678 mounting `~/.n8n`:
-      `pnpm build:docker` (if `n8nio/n8n:local` not built) → `scripts/n8n-up.sh`. Verify `/healthz` 200
-      and that all 4 workflows are present (`search_workflows`) and render. `scripts/n8n-down.sh` to stop.
-      - 2026-06-05 blocked: this session's `docker info` → permission denied on `/var/run/docker.sock`
-        (the in-IDE agent is not in the docker group), and it's an APPLY/outward step besides. Persistence
-        (D-0) is already done, so the bring-up itself is the only gap. **Unblock path:** run in a
-        docker-enabled shell — the user's terminal or the `ralph-n8n.sh` runner (`claude -p` in that
-        shell): `pnpm build:docker` (once) then `scripts/n8n-up.sh`. Re-grounded each resume.
+- [x] D-1: **(DONE 2026-06-21)** Brought up the dockerized n8n on :5678 mounting `~/.n8n`:
+      `scripts/n8n-up.sh` (image `n8nio/n8n:local` already built) → `/healthz` **200**; imported the 4
+      source-of-truth workflows into the container (`n8n import:workflow --separate`) and confirmed all
+      render via `list:workflow`: bridge `ggvV5wItgjsRnwFk` (INACTIVE per D-4), viz `ghqgmnJnB8zMMmAN` /
+      `baU04FGqVHA0pntk` / `7z11ihYBJ7soxaik` (do-not-run). `scripts/n8n-down.sh` stops it; `~/.n8n` kept.
+      - **Superseded note:** the earlier "blocked — docker.sock permission denied / needs a human shell"
+        framing no longer holds. Docker access is available and the loop's design replaces
+        human-in-the-loop with the agent, so the agent performs the bring-up directly.
+      - (historical) 2026-06-05: docker.sock was permission-denied for that session's in-IDE agent,
+        so D-1 was deferred until a docker-enabled session; that gap is now closed (see DONE above).
 - [x] D-2: Triage **Dependabot PR #1** (`chore(deps): Bump the uv group …` — Python uv deps under
       `ai-workflow-builder.ee/evaluations`). Review the bump; merge if CI green, else close with reason.
       - **RESOLVED 2026-06-05T21:19Z (APPLY):** relanded with the corrected title as **PR #8**
