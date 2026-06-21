@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "handoff.backlog_item.n8n.v1",
+  "title": "Backlog Item — n8n-loop harness",
+  "description": "Machine-readable backlog item format. Maps the existing markdown - [ ] / - [x] / - [!] checklist to structured JSON for DataTable persistence.",
+  "type": "object",
+  "required": ["id", "title", "status", "epic"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[A-Z]-[0-9]+$" },
+    "title": { "type": "string", "minLength": 3 },
+    "description": { "type": "string" },
+    "status": { "type": "string", "enum": ["todo", "done", "blocked"] },
+    "epic": { "type": "string" },
+    "priority": { "type": "string", "enum": ["P0", "P1", "P2", "P3"], "default": "P2" },
+    "depends_on": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "automation_type": { "type": "string", "enum": ["agent", "n8n_workflow", "both"] },
+    "verification_gates": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["cargo_check", "bun_test", "lint", "run_n8n_smoke", "mutant_score", "validate_workflow"] }
+    },
+    "source": { "type": "string", "enum": ["linear", "github_issues", "specs", "meta_yaml", "workspace_state", "user_input"], "description": "Where this item was discovered" },
+    "assigned_agent": { "type": "string", "description": "Agent spec that handles orchestration (e.g., 'backlog-curators.md')" },
+    "n8n_workflow_ref": { "type": "string", "description": "n8n workflow file that automates this item" },
+    "blocked_reason": { "type": "string", "description": "Required when status is 'blocked'" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": ["string", "null"], "format": "date-time" }
+  },
+  "additionalProperties": true
+}

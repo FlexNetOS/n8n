@@ -1,0 +1,167 @@
+{
+  "name": "n8n-loop Handoff Resume",
+  "description": "Implements handoff/resume semantics for the n8n autonomous loop using DataTables as ledger, HTTP for weave broadcast, and Schedule triggers for successor scheduling.",
+  "active": false,
+  "nodes": [
+    {
+      "id": "schedule-trigger",
+      "name": "Schedule Handoff Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "num": 5 }]
+        }
+      },
+      "position": [240, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "read-packet",
+      "name": "Read Active Packet",
+      "type": "@n8n/n8n-nodes-langchain.n8nDataTable",
+      "parameters": {
+        "operation": "getItems",
+        "tableName": "handoff_packets",
+        "filters": {
+          "archived": false,
+          "limit": 1,
+          "sortBy": "created_at:desc"
+        }
+      },
+      "position": [460, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "check-task",
+      "name": "Has Active Task?",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "condition": "json",
+        "value1": "={{ $json.current_task_id }}",
+        "operation": "notEmpty"
+      },
+      "position": [680, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "validate-schema",
+      "name": "Validate JSON Schema",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "=// Validate the packet against _workspace/handoff/schemas/packet-n8n.schema.json\nconst fs = require('fs');\nconst path = require('path');\nconst wsPath = process.env.HOME + '/Desktop/meta/n8n/_workspace';\ntry {\n  const schema = JSON.parse(fs.readFileSync(path.join(wsPath, 'handoff/schemas/packet-n8n.schema.json'), 'utf8'));\n  // Basic validation: check required fields exist\n  const required = schema.required || [];\n  for (const field of required) {\n    if (!packet[field]) throw new Error(`Missing required field: ${field}`);\n  }\n  return { json: { valid: true, packet } };\n} catch(e) {\n  throw new Error('Schema validation failed: ' + e.message);\n}"
+      },
+      "position": [900, 250],
+      "typeVersion": 1
+    },
+    {
+      "id": "compile-resume",
+      "name": "Compile Resume Packet",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "=// Compile the human-readable resume prompt\nconst p = $json.packet;\nreturn {\n  json: {\n    resume_command: `/n8n-loop resume from _workspace/HANDOFF.md (branch ${p.branch})`,\n    active_objective: p.active_objective,\n    current_item: p.current_task_id,\n    drift_status: p.drift_status,\n    verify_commands: [`git -C ${process.env.HOME}/Desktop/meta/n8n status`],\n    next_step: p.next_command\n  }\n}"
+      },
+      "position": [900, 350],
+      "typeVersion": 1
+    },
+    {
+      "id": "weave-broadcast",
+      "name": "Weave Broadcast Resumed",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://localhost:{{ env('WEAVE_PORT', '8080') }}/api/send",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "={\n  \"to\": \"all\",\n  \"subject\": \"n8n-relay:resumed\",\n  \"body\": `RESUMED @ ${new Date().toISOString()}, objective: ${$json.active_objective}, item: ${$json.current_item}`\n}"
+      },
+      "position": [1120, 350],
+      "typeVersion": 1
+    },
+    {
+      "id": "archive-packet",
+      "name": "Archive Old Packet",
+      "type": "@n8n/n8n-nodes-langchain.n8nDataTable",
+      "parameters": {
+        "operation": "updateItem",
+        "tableName": "handoff_packets",
+        "itemFilter": "=eq($json.packet_id, 'packet_id')",
+        "fields": {
+          "archived": true
+        }
+      },
+      "position": [1120, 450],
+      "typeVersion": 1
+    },
+    {
+      "id": "reset-counter",
+      "name": "Reset Session Counter",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "=// Write reset loop_state.md\nconst fs = require('fs');\nconst path = require('path');\nconst wsPath = process.env.HOME + '/Desktop/meta/n8n/_workspace';\nconst loopState = {\n  cycles_this_session: 0,\n  cycles_total: parseInt(fs.readFileSync(path.join(wsPath, 'loop_state.md'), 'utf8')?.match(/cycles_total=(\\d+)/)?.[1] || '0') + ($json.total || 0),\n  cycle_budget: 3,\n  last_item: $json.current_item,\n  status: 'resumed',\n  apply_mode: false\n};\nfs.writeFileSync(path.join(wsPath, 'loop_state.md'), Object.entries(loopState).map(([k,v]) => `${k}=${v}`).join('\\n'));\nreturn { json: { cycles_reset: true } };"
+      },
+      "position": [1340, 350],
+      "typeVersion": 1
+    },
+    {
+      "id": "write-handoff",
+      "name": "Write Checkpoint File",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "=// Produce _workspace/HANDOFF.md for human readability\nconst fs = require('fs');\nconst path = require('path');\nconst wsPath = process.env.HOME + '/Desktop/meta/n8n/_workspace';\nconst p = $json.packet;\nconst lines = [\n  `# n8n-loop HANDOFF — ${new Date().toISOString()}`,\n  `## Repo & branch   — ~/Desktop/meta/n8n @ ${p.branch}`,\n  `## Backlog          — ${p.active_objective} (task: ${p.current_task_id})`,\n  `## Drift status     — ${p.drift_status}`,\n  `## Next command     — ${p.next_command}`,\n  `## Verify-on-resume — git status clean + scoped build`\n];\nfs.writeFileSync(path.join(wsPath, 'HANDOFF.md'), lines.join('\\n'));\nreturn { json: { checkpoint_written: true } };"
+      },
+      "position": [1340, 550],
+      "typeVersion": 1
+    },
+    {
+      "id": "spawn-successor",
+      "name": "Spawn Successor Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "{{ env('CLAUDE_API_BASE', 'http://localhost:3000') }}/v1/messages",
+        "method": "POST",
+        "body": "={\n  \"prompt\": `/n8n-loop resume (DataTable-backed). Active: ${$json.active_objective}. Item: ${$json.current_item}. Verify baseline, reset counter, continue.`,\n  \"model\": \"opus\"\n}"
+      },
+      "position": [1560, 350],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Schedule Handoff Check": {
+      "main": [[{ "node": "Read Active Packet", "type": "main", "index": 0 }]]
+    },
+    "Read Active Packet": {
+      "main": [[{ "node": "Has Active Task?", "type": "main", "index": 0 }]]
+    },
+    "Has Active Task?": {
+      "main": [
+        [{ "node": "Validate JSON Schema", "type": "main", "index": 0 }],
+        [{ "node": "Compile Resume Packet", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate JSON Schema": {
+      "main": [[{ "node": "Compile Resume Packet", "type": "main", "index": 0 }]]
+    },
+    "Compile Resume Packet": {
+      "main": [
+        [{ "node": "Weave Broadcast Resumed", "type": "main", "index": 0 }],
+        [{ "node": "Write Checkpoint File", "type": "main", "index": 0 }]
+      ]
+    },
+    "Weave Broadcast Resumed": {
+      "main": [[{ "node": "Reset Session Counter", "type": "main", "index": 0 }]]
+    },
+    "Write Checkpoint File": {
+      "main": [[{ "node": "Archive Old Packet", "type": "main", "index": 0 }]]
+    },
+    "Archive Old Packet": {
+      "main": [[{ "node": "Reset Session Counter", "type": "main", "index": 0 }]]
+    },
+    "Reset Session Counter": {
+      "main": [[{ "node": "Spawn Successor Agent", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
