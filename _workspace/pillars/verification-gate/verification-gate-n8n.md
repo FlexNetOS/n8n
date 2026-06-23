@@ -17,7 +17,7 @@ Given a set of changed/repo targets, run the full verification suite in safe exe
 
 ### Gate 1: cargo check — workspace members
 ```bash
-cd /home/drdave/Desktop/meta && cargo check --workspace --all-targets
+cd $META_ROOT && cargo check --workspace --all-targets
 ```
 - Run first because Rust crates have the widest blast radius
 - Use `--all-targets` to catch proc-macro and test compilation errors
@@ -26,7 +26,7 @@ cd /home/drdave/Desktop/meta && cargo check --workspace --all-targets
 
 ### Gate 2: bun test — harness scripts
 ```bash
-cd /home/drdave/Desktop/meta/n8n && bun test _workspace/handoff/scripts/
+cd $META_ROOT/n8n && bun test _workspace/handoff/scripts/
 ```
 - Run bun test for all harness script unit tests
 - Also run `bunx biome check --write .` if any JS files changed
@@ -34,7 +34,7 @@ cd /home/drdave/Desktop/meta/n8n && bun test _workspace/handoff/scripts/
 
 ### Gate 3: n8n source lint (if touched)
 ```bash
-cd /home/drdave/Desktop/meta/n8n && bunx biome check packages/cli --write
+cd $META_ROOT/n8n && bunx biome check packages/cli --write
 ```
 - Only run if changes touch n8n TypeScript/JS source files
 - Uses biome (n8n's linter) instead of ESLint
@@ -52,7 +52,7 @@ curl -s http://localhost:5678/healthz | grep '"status":"ready"'
 
 ### Gate 5: mutant score (optional)
 ```bash
-cd /home/drdave/Desktop/meta/n8n && bunx mutant-score packages/core/src/
+cd $META_ROOT/n8n && bunx mutant-score packages/core/src/
 ```
 - Optional: runs mutation analysis on changed test files
 - Confirms tests actually assert meaningful behavior

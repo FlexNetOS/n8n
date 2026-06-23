@@ -54,7 +54,7 @@ on:
 jobs:
   run-evals:
     name: 'Run Evals'
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ${{ vars.N8N_CI_RUNNER_4CPU || 'ubuntu-latest' }}
     timeout-minutes: 90
     env:
       # Each port hosts an independent n8n container. The eval CLI's

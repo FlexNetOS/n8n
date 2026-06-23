@@ -12,7 +12,7 @@ All telemetry uses the same format:
   "benchmark_name": "kafka-throughput-10n-10kb",
   "git":    { "sha": "abc12345", "branch": "master", "pr": null },
   "ci":     { "runId": "123", "runUrl": "...", "job": "test", "workflow": "CI", "attempt": 1 },
-  "runner": { "provider": "blacksmith", "cpuCores": 8, "memoryGb": 16.0 },
+  "runner": { "provider": "github", "cpuCores": 2, "memoryGb": 7.0 },
   "metrics": [
     { "metric_name": "exec-per-sec", "value": 12.4, "unit": "exec/s", "dimensions": { "trigger": "kafka", "nodes": 10 } }
   ]
@@ -32,7 +32,7 @@ ci.job          // GITHUB_JOB
 ci.workflow     // GITHUB_WORKFLOW
 ci.attempt      // GITHUB_RUN_ATTEMPT
 
-runner.provider  // 'github' | 'blacksmith' | 'local'
+runner.provider  // 'github' | 'self-hosted' | 'local'
 runner.cpuCores  // os.cpus().length
 runner.memoryGb  // os.totalmem()
 ```
@@ -41,7 +41,7 @@ runner.memoryGb  // os.totalmem()
 ```typescript
 if (!process.env.CI) return 'local';
 if (process.env.RUNNER_ENVIRONMENT === 'github-hosted') return 'github';
-return 'blacksmith';
+return 'self-hosted';
 ```
 
 ## Implementations

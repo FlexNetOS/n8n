@@ -75,7 +75,7 @@
       "name": "Check Sentinels",
       "type": "n8n-nodes-base.code",
       "parameters": {
-        "func": "=const WS = process.env.HOME + '/Desktop/meta/n8n/_workspace';\nconst fs = require('fs');\nconst sentinels = ['DONE', 'NEEDS-HUMAN', 'STOP'];\nfor (const s of sentinels) {\n  if (fs.existsSync(WS + '/' + s)) {\n    console.log(`Stopping: sentinel ${s} present`);\n    return { json: { stop: true, reason: s } };\n  }\n}\nreturn { json: { stop: false } };"
+        "func": "=const WS = process.env.META_ROOT + '/n8n/_workspace';\nconst fs = require('fs');\nconst sentinels = ['DONE', 'NEEDS-HUMAN', 'STOP'];\nfor (const s of sentinels) {\n  if (fs.existsSync(WS + '/' + s)) {\n    console.log(`Stopping: sentinel ${s} present`);\n    return { json: { stop: true, reason: s } };\n  }\n}\nreturn { json: { stop: false } };"
       },
       "position": [1120, 450],
       "typeVersion": 1

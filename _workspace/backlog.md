@@ -18,7 +18,7 @@ Seeded 2026-06-05 from the `/harness:harness` upgrade (build everything 1–5, l
         skill frontmatter intact. Committed; ledger ticked. Loop machinery proven live.
 
 ## Epic A — map the entire meta codebase
-- [x] A-1: Inventory every meta repo from `~/Desktop/meta/.meta.yaml` (name, path, remote, language,
+- [x] A-1: Inventory every meta repo from `$META_ROOT/.meta.yaml` (name, path, remote, language,
       `meta:true` nesting) → write `_workspace/meta-inventory.md`.
       - 2026-06-05: wrote `_workspace/meta-inventory.md` — 51 projects, all cloned as independent
         repos. 21 Rust / 5 JS-TS / 2 Python / ~23 docs-hub; 1 nested (`mcp_hub` meta:true); 1 path

@@ -19,7 +19,7 @@ For each cycle, identify which repos have documentation that needs updating:
 
 ### 1. CHANGELOG.md files
 Every meta repo with a `CHANGELOG.md` at its root gets an entry appended under `[Unreleased]`:
-- `/home/drdave/Desktop/meta/n8n/CHANGELOG.md`
+- `$META_ROOT/n8n/CHANGELOG.md`
 - Each `.meta.yaml` project's root (if it has a changelog)
 
 Entry format: conventional commits area-prefixed:

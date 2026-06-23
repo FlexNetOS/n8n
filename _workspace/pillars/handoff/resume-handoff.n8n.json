@@ -48,7 +48,7 @@
       "name": "Validate JSON Schema",
       "type": "n8n-nodes-base.code",
       "parameters": {
-        "func": "=// Validate the packet against _workspace/handoff/schemas/packet-n8n.schema.json\nconst fs = require('fs');\nconst path = require('path');\nconst wsPath = process.env.HOME + '/Desktop/meta/n8n/_workspace';\ntry {\n  const schema = JSON.parse(fs.readFileSync(path.join(wsPath, 'handoff/schemas/packet-n8n.schema.json'), 'utf8'));\n  // Basic validation: check required fields exist\n  const required = schema.required || [];\n  for (const field of required) {\n    if (!packet[field]) throw new Error(`Missing required field: ${field}`);\n  }\n  return { json: { valid: true, packet } };\n} catch(e) {\n  throw new Error('Schema validation failed: ' + e.message);\n}"
+        "func": "=// Validate the packet against _workspace/handoff/schemas/packet-n8n.schema.json\nconst fs = require('fs');\nconst path = require('path');\nconst wsPath = process.env.META_ROOT + '/n8n/_workspace';\ntry {\n  const schema = JSON.parse(fs.readFileSync(path.join(wsPath, 'handoff/schemas/packet-n8n.schema.json'), 'utf8'));\n  // Basic validation: check required fields exist\n  const required = schema.required || [];\n  for (const field of required) {\n    if (!packet[field]) throw new Error(`Missing required field: ${field}`);\n  }\n  return { json: { valid: true, packet } };\n} catch(e) {\n  throw new Error('Schema validation failed: ' + e.message);\n}"
       },
       "position": [900, 250],
       "typeVersion": 1
@@ -58,7 +58,7 @@
       "name": "Compile Resume Packet",
       "type": "n8n-nodes-base.code",
       "parameters": {
-        "func": "=// Compile the human-readable resume prompt\nconst p = $json.packet;\nreturn {\n  json: {\n    resume_command: `/n8n-loop resume from _workspace/HANDOFF.md (branch ${p.branch})`,\n    active_objective: p.active_objective,\n    current_item: p.current_task_id,\n    drift_status: p.drift_status,\n    verify_commands: [`git -C ${process.env.HOME}/Desktop/meta/n8n status`],\n    next_step: p.next_command\n  }\n}"
+        "func": "=// Compile the human-readable resume prompt\nconst p = $json.packet;\nreturn {\n  json: {\n    resume_command: `/n8n-loop resume from _workspace/HANDOFF.md (branch ${p.branch})`,\n    active_objective: p.active_objective,\n    current_item: p.current_task_id,\n    drift_status: p.drift_status,\n    verify_commands: [`git -C ${process.env.META_ROOT}/n8n status`],\n    next_step: p.next_command\n  }\n}"
       },
       "position": [900, 350],
       "typeVersion": 1
@@ -98,7 +98,7 @@
       "name": "Reset Session Counter",
       "type": "n8n-nodes-base.code",
       "parameters": {
-        "func": "=// Write reset loop_state.md\nconst fs = require('fs');\nconst path = require('path');\nconst wsPath = process.env.HOME + '/Desktop/meta/n8n/_workspace';\nconst loopState = {\n  cycles_this_session: 0,\n  cycles_total: parseInt(fs.readFileSync(path.join(wsPath, 'loop_state.md'), 'utf8')?.match(/cycles_total=(\\d+)/)?.[1] || '0') + ($json.total || 0),\n  cycle_budget: 3,\n  last_item: $json.current_item,\n  status: 'resumed',\n  apply_mode: false\n};\nfs.writeFileSync(path.join(wsPath, 'loop_state.md'), Object.entries(loopState).map(([k,v]) => `${k}=${v}`).join('\\n'));\nreturn { json: { cycles_reset: true } };"
+        "func": "=// Write reset loop_state.md\nconst fs = require('fs');\nconst path = require('path');\nconst wsPath = process.env.META_ROOT + '/n8n/_workspace';\nconst loopState = {\n  cycles_this_session: 0,\n  cycles_total: parseInt(fs.readFileSync(path.join(wsPath, 'loop_state.md'), 'utf8')?.match(/cycles_total=(\\d+)/)?.[1] || '0') + ($json.total || 0),\n  cycle_budget: 3,\n  last_item: $json.current_item,\n  status: 'resumed',\n  apply_mode: false\n};\nfs.writeFileSync(path.join(wsPath, 'loop_state.md'), Object.entries(loopState).map(([k,v]) => `${k}=${v}`).join('\\n'));\nreturn { json: { cycles_reset: true } };"
       },
       "position": [1340, 350],
       "typeVersion": 1
@@ -108,7 +108,7 @@
       "name": "Write Checkpoint File",
       "type": "n8n-nodes-base.code",
       "parameters": {
-        "func": "=// Produce _workspace/HANDOFF.md for human readability\nconst fs = require('fs');\nconst path = require('path');\nconst wsPath = process.env.HOME + '/Desktop/meta/n8n/_workspace';\nconst p = $json.packet;\nconst lines = [\n  `# n8n-loop HANDOFF — ${new Date().toISOString()}`,\n  `## Repo & branch   — ~/Desktop/meta/n8n @ ${p.branch}`,\n  `## Backlog          — ${p.active_objective} (task: ${p.current_task_id})`,\n  `## Drift status     — ${p.drift_status}`,\n  `## Next command     — ${p.next_command}`,\n  `## Verify-on-resume — git status clean + scoped build`\n];\nfs.writeFileSync(path.join(wsPath, 'HANDOFF.md'), lines.join('\\n'));\nreturn { json: { checkpoint_written: true } };"
+        "func": "=// Produce _workspace/HANDOFF.md for human readability\nconst fs = require('fs');\nconst path = require('path');\nconst wsPath = process.env.META_ROOT + '/n8n/_workspace';\nconst p = $json.packet;\nconst lines = [\n  `# n8n-loop HANDOFF — ${new Date().toISOString()}`,\n  `## Repo & branch   — ${process.env.META_ROOT}/n8n @ ${p.branch}`,\n  `## Backlog          — ${p.active_objective} (task: ${p.current_task_id})`,\n  `## Drift status     — ${p.drift_status}`,\n  `## Next command     — ${p.next_command}`,\n  `## Verify-on-resume — git status clean + scoped build`\n];\nfs.writeFileSync(path.join(wsPath, 'HANDOFF.md'), lines.join('\\n'));\nreturn { json: { checkpoint_written: true } };"
       },
       "position": [1340, 550],
       "typeVersion": 1

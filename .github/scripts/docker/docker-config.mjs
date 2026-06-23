@@ -75,6 +75,15 @@ class BuildContext {
 		return context;
 	}
 
+	runnerFor(platform) {
+		const runners = {
+			'linux/amd64': process.env.N8N_CI_RUNNER_AMD64 || process.env.N8N_CI_RUNNER_4CPU,
+			'linux/arm64': process.env.N8N_CI_RUNNER_ARM64 || process.env.N8N_CI_RUNNER_4CPU,
+		};
+
+		return runners[platform] || process.env.N8N_CI_RUNNER_4CPU || 'ubuntu-latest';
+	}
+
 	sanitizeBranch(branch) {
 		if (!branch) return 'unknown';
 		return branch
@@ -86,11 +95,6 @@ class BuildContext {
 	}
 
 	buildMatrix(platforms) {
-		const runners = {
-			'linux/amd64': 'blacksmith-4vcpu-ubuntu-2204',
-			'linux/arm64': 'blacksmith-4vcpu-ubuntu-2204-arm',
-		};
-
 		const matrix = {
 			platform: [],
 			include: [],
@@ -101,7 +105,7 @@ class BuildContext {
 			matrix.platform.push(shortName);
 			matrix.include.push({
 				platform: shortName,
-				runner: runners[platform],
+				runner: this.runnerFor(platform),
 				docker_platform: platform,
 			});
 		}

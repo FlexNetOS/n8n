@@ -18,7 +18,7 @@
         "values": {
           "string": [
             { "name": "changed_crate", "value": "meta_core" },
-            { "name": "repo_root", "value": "/home/drdave/Desktop/meta" }
+            { "name": "repo_root", "value": "={{ $env.META_ROOT }}" }
           ]
         }
       },
@@ -30,7 +30,7 @@
       "name": "Read Cargo.toml Dependencies",
       "type": "n8n-nodes-base.readBinaryFile",
       "parameters": {
-        "filePath": "/home/drdave/Desktop/meta/Cargo.toml"
+        "filePath": "={{ $env.META_ROOT + '/Cargo.toml' }}"
       },
       "position": [680, 300],
       "typeVersion": 1
@@ -40,7 +40,7 @@
       "name": "Build Dependency Graph",
       "type": "n8n-nodes-base.code",
       "parameters": {
-        "func": "// Parse Cargo.toml and build dependency graph\nconst content = $binary['data'].toString('utf8');\nconst lines = content.split('\\n');\nlet inDeps = false;\nlet inWorkspaceDeps = false;\nconst deps = {};\nlet currentCrate = '';\n\nfor (const line of lines) {\n  if (line.startsWith('[workspace.dependencies]')) {\n    inWorkspaceDeps = true;\n    continue;\n  }\n  if (line.startsWith('[')) {\n    inWorkspaceDeps = false;\n    continue;\n  }\n  if (inWorkspaceDeps && line.includes('=')) {\n    const [name, val] = line.split('=').map(s => s.trim().replace(/\"/g, ''));\n    deps[name] = val;\n  }\n}\n\n// Read .meta.yaml projects for cross-repo context\nconst fs = require('fs');\nconst yamlPath = '/home/drdave/Desktop/meta/.meta.yaml';\nlet metaProjects = [];\ntry {\n  const yamlContent = fs.readFileSync(yamlPath, 'utf8');\n  // Simple line-based parsing as fallback\n  const projectLines = yamlContent.split('\\n').filter(l => l.trim().startsWith('-') || (l.startsWith(' ') && !l.includes(':')));\n  metaProjects = projectLines.map(l => l.replace(/[- ]/, '').trim()).filter(Boolean);\n} catch(e) {\n  // If .meta.yaml parsing fails, use known workspace members\n}\n\n// Build reverse dependency map for the changed crate\nconst changedCrate = $json.changed_crate;\nconst dependents = [];\nfor (const [crate, val] of Object.entries(deps)) {\n  if (val.includes(changedCrate) || crate.toLowerCase() === changedCrate.toLowerCase()) {\n    dependents.push(crate);\n  }\n}\n\n// Transitive closure: find all crates that transitively depend on the changed crate\nconst visited = new Set();\nfunction traceTransitive(crate, depth = 0) {\n  if (depth > 10 || visited.has(crate)) return;\n  visited.add(crate);\n  for (const [other, val] of Object.entries(deps)) {\n    if (val.includes(crate) && !visited.has(other)) {\n      traceTransitive(other, depth + 1);\n    }\n  }\n}\ntraceTransitive(changedCrate);\n\nreturn {\n  json: {\n    direct_dependents: dependents,\n    transitive_dependents: [...visited],\n    meta_projects_context: metaProjects.slice(0, 20),\n    graph_built: true\n  }\n};"
+        "func": "// Parse Cargo.toml and build dependency graph\nconst content = $binary['data'].toString('utf8');\nconst lines = content.split('\\n');\nlet inDeps = false;\nlet inWorkspaceDeps = false;\nconst deps = {};\nlet currentCrate = '';\n\nfor (const line of lines) {\n  if (line.startsWith('[workspace.dependencies]')) {\n    inWorkspaceDeps = true;\n    continue;\n  }\n  if (line.startsWith('[')) {\n    inWorkspaceDeps = false;\n    continue;\n  }\n  if (inWorkspaceDeps && line.includes('=')) {\n    const [name, val] = line.split('=').map(s => s.trim().replace(/\"/g, ''));\n    deps[name] = val;\n  }\n}\n\n// Read .meta.yaml projects for cross-repo context\nconst fs = require('fs');\nconst path = require('path');\nconst metaRoot = process.env.META_ROOT;\nif (!metaRoot) throw new Error('META_ROOT is required; run envctl env or ask envctl over weave before running this workflow.');\nconst yamlPath = path.join(metaRoot, '.meta.yaml');\nlet metaProjects = [];\ntry {\n  const yamlContent = fs.readFileSync(yamlPath, 'utf8');\n  // Simple line-based parsing as fallback\n  const projectLines = yamlContent.split('\\n').filter(l => l.trim().startsWith('-') || (l.startsWith(' ') && !l.includes(':')));\n  metaProjects = projectLines.map(l => l.replace(/[- ]/, '').trim()).filter(Boolean);\n} catch(e) {\n  // If .meta.yaml parsing fails, use known workspace members\n}\n\n// Build reverse dependency map for the changed crate\nconst changedCrate = $json.changed_crate;\nconst dependents = [];\nfor (const [crate, val] of Object.entries(deps)) {\n  if (val.includes(changedCrate) || crate.toLowerCase() === changedCrate.toLowerCase()) {\n    dependents.push(crate);\n  }\n}\n\n// Transitive closure: find all crates that transitively depend on the changed crate\nconst visited = new Set();\nfunction traceTransitive(crate, depth = 0) {\n  if (depth > 10 || visited.has(crate)) return;\n  visited.add(crate);\n  for (const [other, val] of Object.entries(deps)) {\n    if (val.includes(crate) && !visited.has(other)) {\n      traceTransitive(other, depth + 1);\n    }\n  }\n}\ntraceTransitive(changedCrate);\n\nreturn {\n  json: {\n    direct_dependents: dependents,\n    transitive_dependents: [...visited],\n    meta_projects_context: metaProjects.slice(0, 20),\n    graph_built: true\n  }\n};"
       },
       "position": [900, 300],
       "typeVersion": 1

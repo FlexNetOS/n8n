@@ -10,7 +10,7 @@
     "pnpm start": "NODE_ENV=development bun run packages/cli/src/bin/start.ts"
   },
   "scripts_path": "_workspace/handoff/scripts/",
-  "meta_repo_root": "/home/drdave/Desktop/meta/",
+  "meta_repo_root": "${META_ROOT}/",
   "harness_toolchain": {
     "install": "bun install",
     "test": "bun test",

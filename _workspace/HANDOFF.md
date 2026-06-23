@@ -18,7 +18,7 @@ new backlog items exist.
    (D-1 is done; `scripts/n8n-up.sh` / `scripts/n8n-down.sh` manage the dockerized instance.)
 
 ## Repo, branch & policy  ⚠️ READ THIS
-- Path: `~/Desktop/meta/n8n`. Remote `FlexNetOS/n8n`. Memory: `n8n-branching-workflow`.
+- Path: `$META_ROOT/n8n`. Remote `FlexNetOS/n8n`. Memory: `n8n-branching-workflow`.
 - **`master` = production, NO direct pushes** (classifier denies — DESIRED; don't add an allow rule).
   Dev work = feature branch off `develop` → `gh pr create --base develop` → **auto-merge on green**.
 - Current HEAD branch: **`harness/epic-d`** (merged up to current `develop`).
@@ -73,10 +73,10 @@ Verification: 13/13 smoke test checks PASS, golden packet validates against sche
 
 ## Verify-on-resume baseline
 ```bash
-git -C ~/Desktop/meta/n8n branch --show-current          # harness/epic-d (or develop if merged)
-git -C ~/Desktop/meta/n8n log --oneline -5               # 90d8962 / be3889ae / 524ab23 (harness upgrade)
-git -C ~/Desktop/meta/n8n status --short                 # clean after handoff commit
-node ~/Desktop/meta/n8n/scripts/validate-harness-workflows.mjs   # 4/4 valid, exit 0
+git -C $META_ROOT/n8n branch --show-current          # harness/epic-d (or develop if merged)
+git -C $META_ROOT/n8n log --oneline -5               # 90d8962 / be3889ae / 524ab23 (harness upgrade)
+git -C $META_ROOT/n8n status --short                 # clean after handoff commit
+node $META_ROOT/n8n/scripts/validate-harness-workflows.mjs   # 4/4 valid, exit 0
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5678/healthz   # 200 if n8n up
 docker info >/dev/null 2>&1 && echo docker-OK || echo docker-DENIED      # docker available
 docker exec n8n n8n list:workflow                                        # 4 harness wf render + 2 smoke

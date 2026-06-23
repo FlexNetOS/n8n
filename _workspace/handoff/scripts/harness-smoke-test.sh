@@ -4,6 +4,7 @@ set -euo pipefail
 
 WS="$(pwd)/_workspace"
 HANDBASE="$WS/handoff"
+META_ROOT="$("$HANDBASE/scripts/resolve-meta-root.sh")"
 PASSED=0
 FAILED=0
 
@@ -34,10 +35,10 @@ fi
 
 # --- Test 3: Backlog curator discovery readiness ---
 log "Test 3: Backlog-curator discovery sources"
-if [ -f "/home/drdave/Desktop/meta/.meta.yaml" ]; then
+if [ -f "$META_ROOT/.meta.yaml" ]; then
   pass ".meta.yaml found — backlog-curator has source of truth"
 else
-  fail ".meta.yaml missing at /home/drdave/Desktop/meta/ — cannot discover work items"
+  fail ".meta.yaml missing at META_ROOT ($META_ROOT) — cannot discover work items"
 fi
 
 if grep -q 'workspace_members' _workspace/pillars/backlog-curator/meta-discovery.n8n.json 2>/dev/null; then

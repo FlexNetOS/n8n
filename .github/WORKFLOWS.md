@@ -343,7 +343,7 @@ test-workflows-pr-comment.yml
 
 | Aspect             | Internal PR                      | Fork PR                 |
 |--------------------|----------------------------------|-------------------------|
-| E2E Runner         | `blacksmith-2vcpu-ubuntu-2204`   | `ubuntu-latest`         |
+| E2E Runner         | `${{ vars.N8N_CI_RUNNER_2CPU }}` | `ubuntu-latest`         |
 | E2E Mode           | `docker-build` (multi-main)      | `local` (SQLite)        |
 | E2E Shards         | 14 + 2                           | 6 + 2                   |
 | Test Command       | `test:container:multi-main:*`    | `test:local:*`          |
@@ -499,37 +499,22 @@ Team ownership mappings in `CODEOWNERS`:
 
 ## Runner Selection
 
-| Runner                              | vCPU | Use Case                    |
-|-------------------------------------|------|-----------------------------|
-| `ubuntu-slim`                       | 1    | Gate jobs (required-checks) |
-| `ubuntu-latest`                     | 2    | Simple jobs, fork PR E2E    |
-| `blacksmith-2vcpu-ubuntu-2204`      | 2    | Standard builds, E2E shards |
-| `blacksmith-4vcpu-ubuntu-2204`      | 4    | Unit tests, typecheck, lint |
-| `blacksmith-8vcpu-ubuntu-2204`      | 8    | Heavy parallel workloads    |
-| `blacksmith-4vcpu-ubuntu-2204-arm`  | 4    | ARM64 Docker builds         |
+| Runner variable        | Fallback        | Use Case                    |
+|------------------------|-----------------|-----------------------------|
+| `N8N_CI_RUNNER_2CPU`   | `ubuntu-latest` | Standard builds, E2E shards |
+| `N8N_CI_RUNNER_4CPU`   | `ubuntu-latest` | Unit tests, typecheck, lint |
+| `N8N_CI_RUNNER_8CPU`   | `ubuntu-latest` | Heavy parallel workloads    |
+| `N8N_CI_RUNNER_AMD64`  | `N8N_CI_RUNNER_4CPU` / `ubuntu-latest` | AMD64 Docker builds |
+| `N8N_CI_RUNNER_ARM64`  | `N8N_CI_RUNNER_4CPU` / `ubuntu-latest` | ARM64 Docker builds |
+| `ubuntu-slim`          | n/a             | Gate jobs (required-checks) |
 
 ### Selection Guidelines
 
-**`ubuntu-slim`** - Status check aggregation, gate/required-check jobs, notifications
-
-**`ubuntu-latest`** - Simple build verification, scheduled maintenance, PR comment handlers, release tagging, Docker manifest creation, any job where speed is not critical
-
-**`blacksmith-2vcpu-ubuntu-2204`** - Initial build/install (benefits from Blacksmith caching), database integration tests (I/O bound), Chromatic/Storybook builds
-
-**`blacksmith-4vcpu-ubuntu-2204`** - Unit tests (parallelized), linting (parallel file processing), typechecking (CPU-intensive), E2E test shards
-
-**`blacksmith-8vcpu-ubuntu-2204`** - Heavy parallel workloads
+Use repository variables for runner placement. Keep the checked-in workflow source provider-neutral so envctl/meta can move jobs between GitHub-hosted and self-hosted runners without code changes.
 
 ### Runner Provider Toggle
 
-The `RUNNER_PROVIDER` repository variable controls runner selection across workflows:
-
-| Value | Behavior |
-|-------|----------|
-| (unset) | Use Blacksmith runners (default) |
-| `github` | Use GitHub-hosted `ubuntu-latest` |
-
-**Note:** When set to `github`, all jobs use `ubuntu-latest` regardless of any runner inputs or defaults specified in reusable workflows. GitHub runners have fewer vCPUs (2 vs 4), so jobs may run slower.
+The `N8N_CI_RUNNER_*` repository variables control runner selection across workflows. Leave them unset to fall back to `ubuntu-latest`, or set them to meta/envctl-managed self-hosted labels when that runner pool is healthy.
 
 ---
 

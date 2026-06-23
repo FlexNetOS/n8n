@@ -15,7 +15,7 @@
       "name": "Read .meta.yaml Projects",
       "type": "n8n-nodes-base.readBinaryFile",
       "parameters": {
-        "filePath": "/home/drdave/Desktop/meta/.meta.yaml"
+        "filePath": "={{ $env.META_ROOT + '/.meta.yaml' }}"
       },
       "position": [460, 250],
       "typeVersion": 1
@@ -25,7 +25,7 @@
       "name": "Read Cargo.toml Workspace",
       "type": "n8n-nodes-base.readBinaryFile",
       "parameters": {
-        "filePath": "/home/drdave/Desktop/meta/Cargo.toml"
+        "filePath": "={{ $env.META_ROOT + '/Cargo.toml' }}"
       },
       "position": [460, 350],
       "typeVersion": 1
@@ -87,7 +87,7 @@
       "name": "Write backlog.md Markdown",
       "type": "n8n-nodes-base.code",
       "parameters": {
-        "func": "=const fs = require('fs');\nconst path = require('path');\nconst WS = process.env.HOME + '/Desktop/meta/n8n/_workspace';\n\nlet md = '# n8n-loop Backlog\\n';\nmd += `## Updated: ${new Date().toISOString()}\\n\\n`;\n\n// Group by epic\nconst epics = {};\nfor (const item of $json.items) {\n  if (!epics[item.epic]) epics[item.epic] = [];\n  epics[item.epic].push(item);\n}\n\nfor (const [epic, items] of Object.entries(epics)) {\n  md += `### ${epic}\\n\\n`;\n  for (const item of items) {\n    const checked = item.status === 'done' ? 'x' : ' ';\n    md += `- [${checked}] ${item.id}: ${item.title}` + '\\n';\n    md += `  - automation_type: ${item.automation_type}` + '\\n';\n    md += `  - verify_gates: cargo_check, bun_test, lint` + '\\n';\n    if (item.depends_on.length > 0) {\n      md += `  - depends_on: ${JSON.stringify(item.depends_on)}` + '\\n';\n    }\n    md += '\\n';\n  }\n}\n\nfs.writeFileSync(path.join(WS, 'backlog.md'), md);\nreturn { json: { backlog_written: true, items_count: $json.items.length } };"
+        "func": "=const fs = require('fs');\nconst path = require('path');\nconst WS = process.env.META_ROOT + '/n8n/_workspace';\n\nlet md = '# n8n-loop Backlog\\n';\nmd += `## Updated: ${new Date().toISOString()}\\n\\n`;\n\n// Group by epic\nconst epics = {};\nfor (const item of $json.items) {\n  if (!epics[item.epic]) epics[item.epic] = [];\n  epics[item.epic].push(item);\n}\n\nfor (const [epic, items] of Object.entries(epics)) {\n  md += `### ${epic}\\n\\n`;\n  for (const item of items) {\n    const checked = item.status === 'done' ? 'x' : ' ';\n    md += `- [${checked}] ${item.id}: ${item.title}` + '\\n';\n    md += `  - automation_type: ${item.automation_type}` + '\\n';\n    md += `  - verify_gates: cargo_check, bun_test, lint` + '\\n';\n    if (item.depends_on.length > 0) {\n      md += `  - depends_on: ${JSON.stringify(item.depends_on)}` + '\\n';\n    }\n    md += '\\n';\n  }\n}\n\nfs.writeFileSync(path.join(WS, 'backlog.md'), md);\nreturn { json: { backlog_written: true, items_count: $json.items.length } };"
       },
       "position": [1560, 300],
       "typeVersion": 1

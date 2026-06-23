@@ -16,14 +16,14 @@ Scan authoritative sources across the meta workspace to discover what needs to b
 ## Data sources (in priority order)
 
 ### 1. `.meta.yaml` project graph
-Read `/home/drdave/Desktop/meta/.meta.yaml` and extract:
+Read `$META_ROOT/.meta.yaml` and extract:
 - `projects:` entries — each repo is a candidate epic ("map/automate <repo-name>")
 - `tags:` on each project — group items by tag (e.g., `[hub, plugins]`, `[foundation]`)
 - Projects with `meta: true` (nested meta repos) — these need recursive scanning
 - Forked repos with `path:` overrides — potential clone-and-index work items
 
 ### 2. Cargo workspace dependencies
-Read `/home/drdave/Desktop/meta/Cargo.toml` and extract:
+Read `$META_ROOT/Cargo.toml` and extract:
 - `workspace.members:` — dependency-aware epic ordering (foundation crates before consumers)
 - `dependencies:` between crates → transitive epic ordering chains
 - Crates with `[features]` that are optional/untested → feature-gating work items
@@ -37,7 +37,7 @@ Query open Linear issues/tickets relevant to:
 Command pattern: `gh issue list --repo FlexNetOS/n8n --state open --json title,url,state,labels`
 
 ### 4. Spec documents
-Read `/home/drdave/Desktop/meta/n8n/.claude/specs/` for specs not yet implemented:
+Read `$META_ROOT/n8n/.claude/specs/` for specs not yet implemented:
 - Each unimplemented spec is a potential backlog item
 - Cross-reference with `.meta.yaml` to find target repos
 

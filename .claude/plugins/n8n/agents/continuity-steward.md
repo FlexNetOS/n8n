@@ -36,7 +36,7 @@ Pass these in the `n8n_manage_datatable insertRows` call:
 ## What to capture (read the real state — don't guess)
 
 Gather from the worktree + loop state:
-- **Branch & path** — the exact repo path (`~/Desktop/meta/n8n`) and branch the loop runs on.
+- **Branch & path** — the exact repo path (`$META_ROOT/n8n`) and branch the loop runs on.
 - **Backlog status** — read `_workspace/backlog.md`: items done / in-flight / pending, with the
   current item starred. The backlog is the loop's source of truth; mirror it exactly. Preserve the
   epic grouping (each big initiative — meta-map, claude↔n8n-chat bridge, n8n visualization — is an
@@ -64,7 +64,7 @@ Write `_workspace/HANDOFF.md` with this structure (scannable — headings + bull
 ```
 # n8n-loop HANDOFF — <UTC timestamp passed in by the orchestrator>
 ## Resume command   — exact: /n8n-loop resume from _workspace/HANDOFF.md (branch <b>)
-## Repo & branch    — ~/Desktop/meta/n8n @ <branch> + `git status` cleanliness
+## Repo & branch    — $META_ROOT/n8n @ <branch> + `git status` cleanliness
 ## Backlog          — epics + items: done / in-flight / pending (current item starred)
 ## Cycle ledger     — N this session, M total; budget that tripped the handoff
 ## In-flight cycle  — active skill + partial artifact paths (or "none — clean boundary")

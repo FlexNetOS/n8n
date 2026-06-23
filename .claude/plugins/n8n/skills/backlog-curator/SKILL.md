@@ -29,8 +29,8 @@ Discovers real work from authoritative meta workspace sources and produces a pri
 
 | Source | Path | What it provides |
 |--------|------|-----------------|
-| .meta.yaml projects | `/home/drdave/Desktop/meta/.meta.yaml` | Repo list, tags, nested meta repos |
-| Cargo workspace | `/home/drdave/Desktop/meta/Cargo.toml` | Dependency graph for topo ordering |
+| .meta.yaml projects | `$META_ROOT/.meta.yaml` | Repo list, tags, nested meta repos |
+| Cargo workspace | `$META_ROOT/Cargo.toml` | Dependency graph for topo ordering |
 | Linear/GitHub issues | `gh issue list --repo FlexNetOS/n8n --state open --json title,url,state,labels` | Open work items |
 | Spec docs | `.claude/specs/` unimplemented specs | Pending feature proposals |
 | Prior backlog state | `_workspace/backlog.md` | Carry-forward incomplete items |

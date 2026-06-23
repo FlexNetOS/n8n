@@ -2,8 +2,8 @@
 # Meta workspace inventory
 
 > Backlog item **A-1** (`n8n-loop`, Epic A — map the entire meta codebase).
-> Source of truth: `~/Desktop/meta/.meta.yaml`. Generated 2026-06-05.
-> Columns: **name** · **path** (relative to `~/Desktop/meta/`; default = name) · **remote**
+> Source of truth: `$META_ROOT/.meta.yaml`. Generated 2026-06-05.
+> Columns: **name** · **path** (relative to `$META_ROOT/`; default = name) · **remote**
 > (all `git@github.com:FlexNetOS/<name>.git` unless noted) · **language** (best-effort marker-file
 > detect: `Cargo.toml`→Rust, `package.json`→JS/TS, `pyproject.toml`/`setup.py`→Python, `—`=docs/data) ·
 > **nested** (`meta:true` = has its own `.meta.yaml`) · **tags / deps** (from config).

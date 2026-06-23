@@ -39,7 +39,7 @@ For meta workspace analysis, use these sources in order:
 - Forked repos (`path:` overrides) need separate dependency checks
 
 ### 2. Cargo.toml workspace members
-- Read `/home/drdave/Desktop/meta/Cargo.toml` for `[workspace.dependencies]`
+- Read `$META_ROOT/Cargo.toml` for `[workspace.dependencies]`
 - For each changed crate, find all crates in `workspace.members` that reference it
 - Build the reverse mapping: crate → list of dependents
 
