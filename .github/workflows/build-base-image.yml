@@ -38,6 +38,16 @@ jobs:
         shell: bash
         run: echo "owner=$(printf '%s' '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
+      - name: Normalize DockerHub org
+        id: normalize-dockerhub
+        shell: bash
+        run: |
+          dockerhub_org='${{ secrets.DOCKER_USERNAME }}'
+          if [ -z "$dockerhub_org" ]; then
+            dockerhub_org='n8nio'
+          fi
+          echo "owner=$(printf '%s' "$dockerhub_org" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
 
@@ -73,8 +83,8 @@ jobs:
           sbom: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push == true) }}
           push: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.push == true) }}
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/base:${{ matrix.node_version }}-${{ github.sha }}
-            ${{ secrets.DOCKER_USERNAME }}/base:${{ matrix.node_version }}
+            ${{ steps.normalize-dockerhub.outputs.owner }}/base:${{ matrix.node_version }}-${{ github.sha }}
+            ${{ steps.normalize-dockerhub.outputs.owner }}/base:${{ matrix.node_version }}
             ghcr.io/${{ steps.normalize-ghcr.outputs.owner }}/base:${{ matrix.node_version }}-${{ github.sha }}
             ghcr.io/${{ steps.normalize-ghcr.outputs.owner }}/base:${{ matrix.node_version }}
           no-cache: true
