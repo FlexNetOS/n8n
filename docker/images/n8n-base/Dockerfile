@@ -16,7 +16,6 @@ RUN apk add --no-cache busybox-binsh && \
     find /usr/share/fonts/truetype/msttcorefonts/ -type l -exec unlink {} \; && \
     # Install OS dependencies
     apk update && \
-    apk upgrade --no-cache && \
     apk add --no-cache \
         git \
         openssh \
