@@ -61,8 +61,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Detect GitHub App token config
+        id: app-token-config
+        run: |
+          if [ -n "$N8N_ASSISTANT_APP_ID" ] && [ -n "$N8N_ASSISTANT_PRIVATE_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Generate GitHub App Token
-        if: env.N8N_ASSISTANT_APP_ID != '' && env.N8N_ASSISTANT_PRIVATE_KEY != ''
+        if: steps.app-token-config.outputs.configured == 'true'
         id: generate-token
         uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
         with:
