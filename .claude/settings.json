@@ -1,44 +1,56 @@
 {
-	"permissions": {
-		"allow": [
-			"Bash(git log:*)",
-			"Bash(git show:*)",
-			"Bash(grep:*)",
-			"Bash(ls:*)",
-			"Bash(pnpm build)",
-			"Bash(pnpm lint:*)",
-			"Bash(pnpm test:*)",
-			"Bash(pnpm typecheck:*)",
-			"Bash(popd)",
-			"Bash(pushd:*)",
-			"Bash(mkdir -p .claude/plans)",
-			"Write(.claude/plans/*)"
-		]
-	},
-	"hooks": {
-		"PostToolUse": [
-			{
-				"matcher": "Skill",
-				"hooks": [
-					{
-						"type": "command",
-						"command": "node .claude/plugins/n8n/scripts/track-skill-usage.mjs",
-						"timeout": 10,
-						"async": true
-					}
-				]
-			}
-		]
-	},
-	"extraKnownMarketplaces": {
-		"n8n": {
-			"source": {
-				"source": "directory",
-				"path": "./.claude/plugins/n8n"
-			}
-		}
-	},
-	"enabledPlugins": {
-		"n8n@n8n": true
-	}
+  "enabledPlugins": {
+    "n8n@n8n": true
+  },
+  "extraKnownMarketplaces": {
+    "n8n": {
+      "source": {
+        "path": "./.claude/plugins/n8n",
+        "source": "directory"
+      }
+    }
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "async": true,
+            "command": "node .claude/plugins/n8n/scripts/track-skill-usage.mjs",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "Skill"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "sh -lc 'root=\"$(git rev-parse --show-toplevel)\"; exec rusty-idd next --base \"$root\"'",
+            "statusMessage": "Rusty IDD front door: computing the next step",
+            "timeout": 180,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(pnpm build)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(popd)",
+      "Bash(pushd:*)",
+      "Bash(mkdir -p .claude/plans)",
+      "Write(.claude/plans/*)"
+    ]
+  }
 }
