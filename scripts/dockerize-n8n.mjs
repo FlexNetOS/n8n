@@ -143,6 +143,7 @@ const rootDir = isInScriptsDir ? path.join(__dirname, '..') : __dirname;
 const noCache = process.env.DOCKER_BUILD_NO_CACHE === 'true';
 const withBaseImage = process.env.DOCKER_BUILD_BASE_IMAGE === 'true';
 const nodeVersion = process.env.NODE_VERSION || '24.15.0';
+const normalizeImageName = (value) => value.toLowerCase();
 
 const config = {
 	base: {
@@ -153,7 +154,7 @@ const config = {
 	},
 	n8n: {
 		dockerfilePath: path.join(rootDir, 'docker/images/n8n/Dockerfile'),
-		imageBaseName: process.env.IMAGE_BASE_NAME || 'n8nio/n8n',
+		imageBaseName: normalizeImageName(process.env.IMAGE_BASE_NAME || 'n8nio/n8n'),
 		imageTag: process.env.IMAGE_TAG || 'local',
 		get fullImageName() {
 			return `${this.imageBaseName}:${this.imageTag}`;
@@ -161,7 +162,7 @@ const config = {
 	},
 	runners: {
 		dockerfilePath: path.join(rootDir, 'docker/images/runners/Dockerfile'),
-		imageBaseName: process.env.RUNNERS_IMAGE_BASE_NAME || 'n8nio/runners',
+		imageBaseName: normalizeImageName(process.env.RUNNERS_IMAGE_BASE_NAME || 'n8nio/runners'),
 		get imageTag() {
 			// Runners use the same tag as n8n for consistency
 			return config.n8n.imageTag;
