@@ -5,7 +5,6 @@ tmp
 dist
 coverage
 coverage-by-spec
-coverage-by-spec-backend
 npm-debug.log*
 yarn.lock
 google-generated-credentials.json
@@ -108,8 +107,24 @@ stryker.log
 !/_workspace/viz/
 !/_workspace/viz/MAPPING.md
 !/_workspace/viz/*.json
+# Harness upgrade — handoff schemas, DataTable schemas, n8n workflows, pillar agent specs.
+!/_workspace/handoff/
+!/_workspace/handoff/**
+!/_workspace/pillars/
+!/_workspace/pillars/**
+# Epic D decision record — bridge activation policy (D-4); durable security decision.
+!/_workspace/D-4-bridge-activation-policy.md
 packages/@n8n/task-runner-python/task_runner_python.egg-info/
 
 # Claude Code scheduler runtime state (transient)
 .claude/scheduled_tasks.lock
 .claude/scheduled_tasks.json
+
+# handoff continuity: binary ledger cache + migration artifacts are gitignored
+# (committed truth = .handoff/ledger.events.jsonl — ADR-0018 D1 / HFTASK-0067)
+.handoff/**/ledger.db
+.handoff/**/*.db-wal
+.handoff/**/*.db-shm
+.handoff/**/*.rvf
+.handoff/**/*.rvf.lock
+.handoff/**/*.redb.tmp
