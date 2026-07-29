@@ -47,8 +47,13 @@ runs:
         node .github/scripts/retry.mjs --attempts 3 --delay 10 \
           'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
 
+    - name: Skip DHI Registry login when credentials are unavailable
+      if: inputs.login-dhi == 'true' && (inputs.dockerhub-username == '' || inputs.dockerhub-password == '')
+      shell: bash
+      run: echo "Skipping DHI login because DockerHub credentials are unavailable in this context."
+
     - name: Login to DHI Registry
-      if: inputs.login-dhi == 'true'
+      if: inputs.login-dhi == 'true' && inputs.dockerhub-username != '' && inputs.dockerhub-password != ''
       uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
       with:
         registry: dhi.io

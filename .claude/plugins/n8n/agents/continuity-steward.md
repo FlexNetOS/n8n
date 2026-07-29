@@ -15,14 +15,28 @@ not the orchestrator's: that keeps the main thread lean and is itself a token-bu
 
 ## Core role
 
-Produce `_workspace/HANDOFF.md` — a cold-start resume package. A successor that has read **only**
-this file and the committed backlog must be able to continue the loop correctly. Capture **state and
-pointers**, not narrative: where things are, what's next, what not to redo.
+Produce two synchronized checkpoints — machine-readable and human-readable:
+
+1. **`handoff_packets` DataTable row** (authoritative) — write via `@n8n-nodes-langchain.n8nDataTable` with the packet data validated against `_workspace/handoff/schemas/packet-n8n.schema.json`. This is the machine-readable ledger that any workflow or agent can query.
+2. **`_workspace/HANDOFF.md`** (readable checkpoint) — a cold-start resume package for zero-loss human/agent resume.
+
+### What to write to DataTable (packet fields)
+
+Pass these in the `n8n_manage_datatable insertRows` call:
+- `packet_id`, `schema` (use `handoff.packet.n8n.v1`), `project_name` (`n8n-loop`)
+- `active_objective`, `current_task_id`, `task_status`
+- `branch`, `changed_files` (JSON array string)
+- `drift_status`, `next_command`
+- `n8n_workflows` (JSON array string), `dataTable_id` (`handoff_packets`)
+- `execution_status`, `node_types_used` (JSON array string)
+- `created_at` (UTC ISO timestamp, you supply it)
+
+### What to write to HANDOFF.md (human-readable)
 
 ## What to capture (read the real state — don't guess)
 
 Gather from the worktree + loop state:
-- **Branch & path** — the exact repo path (`~/Desktop/meta/n8n`) and branch the loop runs on.
+- **Branch & path** — the exact repo path (`$META_ROOT/n8n`) and branch the loop runs on.
 - **Backlog status** — read `_workspace/backlog.md`: items done / in-flight / pending, with the
   current item starred. The backlog is the loop's source of truth; mirror it exactly. Preserve the
   epic grouping (each big initiative — meta-map, claude↔n8n-chat bridge, n8n visualization — is an
@@ -50,7 +64,7 @@ Write `_workspace/HANDOFF.md` with this structure (scannable — headings + bull
 ```
 # n8n-loop HANDOFF — <UTC timestamp passed in by the orchestrator>
 ## Resume command   — exact: /n8n-loop resume from _workspace/HANDOFF.md (branch <b>)
-## Repo & branch    — ~/Desktop/meta/n8n @ <branch> + `git status` cleanliness
+## Repo & branch    — $META_ROOT/n8n @ <branch> + `git status` cleanliness
 ## Backlog          — epics + items: done / in-flight / pending (current item starred)
 ## Cycle ledger     — N this session, M total; budget that tripped the handoff
 ## In-flight cycle  — active skill + partial artifact paths (or "none — clean boundary")

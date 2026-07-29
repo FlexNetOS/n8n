@@ -1,0 +1,128 @@
+{
+  "name": "Meta Discovery — Automated Backlog Curator",
+  "description": "Discovers work items from all meta workspace sources (.meta.yaml, Cargo.toml, Linear/GitHub, specs) and produces a prioritized backlog DataTable entry.",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual-trigger",
+      "name": "Manual / Cron Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [240, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "read-meta-yaml",
+      "name": "Read .meta.yaml Projects",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "parameters": {
+        "filePath": "={{ $env.META_ROOT + '/.meta.yaml' }}"
+      },
+      "position": [460, 250],
+      "typeVersion": 1
+    },
+    {
+      "id": "read-cargo",
+      "name": "Read Cargo.toml Workspace",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "parameters": {
+        "filePath": "={{ $env.META_ROOT + '/Cargo.toml' }}"
+      },
+      "position": [460, 350],
+      "typeVersion": 1
+    },
+    {
+      "id": "parse-yaml",
+      "name": "Parse .meta.yaml → Projects",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "=const yaml = require('js-yaml');\n// Parse the binary file as YAML\nconst content = $binary['data'].toString('utf8');\ntry {\n  const parsed = yaml.load(content);\n  return {\n    json: {\n      projects: Object.keys(parsed.projects || {}),\n      tags: {},\n      nested_meta: []\n    }\n  };\n} catch(e) {\n  // Fallback: parse as flat lines\n  const lines = content.split('\\n');\n  const projects = lines.filter(l => l.startsWith('  ') && !l.includes(':') && !l.trim().startsWith('#')).map(l => l.trim());\n  return { json: { projects, tags: {}, nested_meta: [], parse_error: e.message } };\n}"
+      },
+      "position": [680, 250],
+      "typeVersion": 1
+    },
+    {
+      "id": "parse-toml",
+      "name": "Parse Cargo.toml → Members",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "=const content = $binary['data'].toString('utf8');\nconst lines = content.split('\\n');\nlet inWorkspace = false;\nlet inMembers = false;\nconst members = [];\nfor (const line of lines) {\n  if (line === '[workspace]') { inWorkspace = true; continue; }\n  if (inWorkspace && line.startsWith('members')) { inMembers = true; continue; }\n  if (inMembers) {\n    const m = line.trim().replace(/,?$/, '');\n    if (m && !m.startsWith('#')) members.push(m);\n    if (line.includes(']') && line.trim() !== ']') break;\n  }\n}\nreturn { json: { workspace_members: members } };"
+      },
+      "position": [680, 350],
+      "typeVersion": 1
+    },
+    {
+      "id": "merge-sources",
+      "name": "Merge Discovery Sources",
+      "type": "n8n-nodes-base.merge",
+      "parameters": {
+        "mode": "combineBranches"
+      },
+      "position": [900, 300],
+      "typeVersion": 2
+    },
+    {
+      "id": "prioritize",
+      "name": "Prioritize Items",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "// Merge and prioritize all discovered work items\nconst metaProjects = $json.projects || [];\nconst cargoMembers = $json.workspace_members || [];\n\n// Generate backlog items from each source\nconst items = [];\n\n// Each .meta.yaml project becomes a map/automate epic item\nfor (const proj of metaProjects) {\n  items.push({\n    id: `map-${proj.toLowerCase()}`,\n    title: `Map ${proj} repo structure and dependencies`,\n    status: 'todo',\n    epic: 'A-MapMetaCodebase',\n    priority: 'P2',\n    depends_on: [],\n    automation_type: 'both',\n    source: 'meta_yaml'\n  });\n}\n\n// Cargo workspace members become verify items\nfor (const member of cargoMembers) {\n  items.push({\n    id: `verify-${member.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,\n    title: `Verify ${member} build/test chain`,\n    status: 'todo',\n    epic: 'B-ToolchainAutomation',\n    priority: 'P1',\n    depends_on: items.filter(i => i.title.includes('foundation') || i.id.startsWith('map-meta-core')).map(i => i.id),\n    automation_type: 'n8n_workflow',\n    source: 'cargo_workspace'\n  });\n}\n\n// Deduplicate and assign priorities\nconst seen = new Set();\nfor (const item of items) {\n  const key = `${item.epic}-${item.id}`;\n  if (!seen.has(key)) {\n    seen.add(key);\n    // Foundation crates are always P0\n    if (['meta_core', 'loop_lib', 'meta_plugin_protocol'].includes(item.id.toLowerCase().replace('verify-', '').replace(/[-_]/g, '_'))) {\n      item.priority = 'P0';\n    }\n  }\n}\n\nreturn { json: { items } };"
+      },
+      "position": [1120, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "write-dt",
+      "name": "Write to handoff_packets DataTable",
+      "type": "@n8n/n8n-nodes-langchain.n8nDataTable",
+      "parameters": {
+        "operation": "addItem",
+        "tableName": "handoff_packets",
+        "item": "=JSON.stringify({\n  packet_id: `pkt-${Date.now().toString(16).padStart(16, '0').slice(-16)}`,\n  schema: 'handoff.backlog_item.n8n.v1',\n  project_name: 'n8n-loop',\n  active_objective: 'Auto-discover meta workspace work items',\n  current_task_id: '',\n  task_status: 'discovered',\n  branch: 'harness/epic-d',\n  changed_files: [],\n  drift_status: 'pass',\n  next_command: '/n8n-loop resume from _workspace/HANDOFF.md',\n  created_at: new Date().toISOString()\n})"
+      },
+      "position": [1340, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "write-backlog",
+      "name": "Write backlog.md Markdown",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "=const fs = require('fs');\nconst path = require('path');\nconst WS = process.env.META_ROOT + '/n8n/_workspace';\n\nlet md = '# n8n-loop Backlog\\n';\nmd += `## Updated: ${new Date().toISOString()}\\n\\n`;\n\n// Group by epic\nconst epics = {};\nfor (const item of $json.items) {\n  if (!epics[item.epic]) epics[item.epic] = [];\n  epics[item.epic].push(item);\n}\n\nfor (const [epic, items] of Object.entries(epics)) {\n  md += `### ${epic}\\n\\n`;\n  for (const item of items) {\n    const checked = item.status === 'done' ? 'x' : ' ';\n    md += `- [${checked}] ${item.id}: ${item.title}` + '\\n';\n    md += `  - automation_type: ${item.automation_type}` + '\\n';\n    md += `  - verify_gates: cargo_check, bun_test, lint` + '\\n';\n    if (item.depends_on.length > 0) {\n      md += `  - depends_on: ${JSON.stringify(item.depends_on)}` + '\\n';\n    }\n    md += '\\n';\n  }\n}\n\nfs.writeFileSync(path.join(WS, 'backlog.md'), md);\nreturn { json: { backlog_written: true, items_count: $json.items.length } };"
+      },
+      "position": [1560, 300],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Manual / Cron Trigger": {
+      "main": [
+        [{ "node": "Read .meta.yaml Projects", "type": "main", "index": 0 },
+         { "node": "Read Cargo.toml Workspace", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse .meta.yaml → Projects": {
+      "main": [[{ "node": "Merge Discovery Sources", "type": "main", "index": 0 }]]
+    },
+    "Read .meta.yaml Projects": {
+      "main": [[{ "node": "Parse .meta.yaml → Projects", "type": "main", "index": 0 }]]
+    },
+    "Parse Cargo.toml → Members": {
+      "main": [[{ "node": "Merge Discovery Sources", "type": "main", "index": 0 }]]
+    },
+    "Read Cargo.toml Workspace": {
+      "main": [[{ "node": "Parse Cargo.toml → Members", "type": "main", "index": 0 }]]
+    },
+    "Merge Discovery Sources": {
+      "main": [[{ "node": "Prioritize Items", "type": "main", "index": 0 }]]
+    },
+    "Prioritize Items": {
+      "main": [
+        [{ "node": "Write to handoff_packets DataTable", "type": "main", "index": 0 }],
+        [{ "node": "Write backlog.md Markdown", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

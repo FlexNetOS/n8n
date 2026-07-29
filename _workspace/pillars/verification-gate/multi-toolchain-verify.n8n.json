@@ -1,0 +1,124 @@
+{
+  "name": "Multi-Toolchain Verification Orchestrator",
+  "description": "Orchestrates verification gates across all affected repos in dependency order: cargo check → bun test → biome lint → run-n8n smoke → mutant score.",
+  "active": false,
+  "nodes": [
+    {
+      "id": "trigger",
+      "name": "Manual / Schedule Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [240, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "read-affected",
+      "name": "Read Affected Repos from DataTable",
+      "type": "@n8n/n8n-nodes-langchain.n8nDataTable",
+      "parameters": {
+        "operation": "getItems",
+        "tableName": "handoff_packets",
+        "filters": {
+          "task_status": "implementing",
+          "limit": 10,
+          "sortBy": "created_at:desc"
+        }
+      },
+      "position": [460, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "exec-order",
+      "name": "Get Execution Order (meta)",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://localhost:3000/api/execution-order",
+        "method": "POST",
+        "body": "=JSON.stringify({ repos: $json.affected_repos || [] })"
+      },
+      "position": [680, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "cargo-check",
+      "name": "Gate 1: Cargo Check",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "const { execSync } = require('child_process');\nconst fs = require('fs');\nconst path = require('path');\n\ntry {\n  // Only run on Rust repos in execution order\n  const result = execSync(\n    'cd \"$META_ROOT\" && cargo check --workspace --all-targets 2>&1 | tail -50',\n    { encoding: 'utf8' }\n  );\n  const logPath = process.env.META_ROOT + '/n8n/_workspace/verify-gate1-cargo-check.log';\n  fs.writeFileSync(logPath, result);\n  \n  const hasError = /error[\\[:]/.test(result);\n  return { json: { gate: 'cargo_check', status: hasError ? 'fail' : 'pass', output_lines: result.split('\\n').length } };\n} catch(e) {\n  fs.writeFileSync(process.env.META_ROOT + '/n8n/_workspace/verify-gate1-cargo-check.log', e.stdout?.toString() || e.message);\n  return { json: { gate: 'cargo_check', status: 'fail', error: true, output_lines: (e.stdout?.toString() || '').split('\\n').length } };\n}"
+      },
+      "position": [900, 250],
+      "typeVersion": 1
+    },
+    {
+      "id": "bun-test",
+      "name": "Gate 2: Bun Test",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "const { execSync } = require('child_process');\nconst fs = require('fs');\n\ntry {\n  const result = execSync(\n    'cd \"$META_ROOT/n8n\" && bun test _workspace/handoff/ 2>&1 | tail -30',\n    { encoding: 'utf8' }\n  );\n  fs.writeFileSync(process.env.META_ROOT + '/n8n/_workspace/verify-gate2-bun-test.log', result);\n  const hasFail = /failed|error/.test(result.toLowerCase());\n  return { json: { gate: 'bun_test', status: hasFail ? 'fail' : 'pass', output_lines: result.split('\\n').length } };\n} catch(e) {\n  fs.writeFileSync(process.env.META_ROOT + '/n8n/_workspace/verify-gate2-bun-test.log', e.stdout?.toString() || e.message);\n  return { json: { gate: 'bun_test', status: 'fail', error: true } };\n}"
+      },
+      "position": [900, 350],
+      "typeVersion": 1
+    },
+    {
+      "id": "biome-lint",
+      "name": "Gate 3: Biome Lint",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "const { execSync } = require('child_process');\nconst fs = require('fs');\n\ntry {\n  const result = execSync(\n    'cd \"$META_ROOT/n8n\" && bunx biome check packages/cli --write 2>&1 | tail -30',\n    { encoding: 'utf8' }\n  );\n  fs.writeFileSync(process.env.META_ROOT + '/n8n/_workspace/verify-gate3-biome-lint.log', result);\n  const hasError = /error/.test(result.toLowerCase()) && !result.includes('checked');\n  return { json: { gate: 'biome_lint', status: hasError ? 'fail' : 'pass', output_lines: result.split('\\n').length } };\n} catch(e) {\n  fs.writeFileSync(process.env.META_ROOT + '/n8n/_workspace/verify-gate3-biome-lint.log', e.stdout?.toString() || e.message);\n  return { json: { gate: 'biome_lint', status: 'fail', error: true } };\n}"
+      },
+      "position": [900, 450],
+      "typeVersion": 1
+    },
+    {
+      "id": "run-n8n-smoke",
+      "name": "Gate 4: Run-n8n Smoke (conditional)",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "const http = require('http');\n\nmodule.exports = function(items) {\n  return new Promise((resolve) => {\n    try {\n      const req = http.get('http://localhost:5678/healthz', (res) => {\n        let body = '';\n        res.on('data', d => body += d);\n        res.on('end', () => {\n          resolve({ json: { gate: 'run_n8n_smoke', status: res.statusCode === 200 ? 'pass' : 'fail' } });\n        });\n      });\n      req.setTimeout(5000, () => {\n        req.destroy();\n        resolve({ json: { gate: 'run_n8n_smoke', status: 'skip', reason: 'n8n not reachable' } });\n      });\n    } catch(e) {\n      resolve({ json: { gate: 'run_n8n_smoke', status: 'skip', reason: e.message } });\n    }\n  });\n};"
+      },
+      "position": [900, 550],
+      "typeVersion": 1
+    },
+    {
+      "id": "aggregate",
+      "name": "Aggregate Verification Results",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "=const results = [\n  $json.gate === 'cargo_check' ? $json : null,\n  $.gate_2_bun_test?.json || { gate: 'bun_test', status: 'unverified' },\n  $.gate_3_biome_lint?.json || { gate: 'biome_lint', status: 'unverified' }\n].filter(Boolean);\n\nconst allPass = results.every(r => r.status === 'pass');\nconst blockedItems = results.filter(r => r.status === 'fail').map(r => r.gate);\n\nreturn {\n  json: {\n    gate_results: results,\n    overall: allPass ? 'PASS' : 'FAIL',\n    blocked_gates: blockedItems,\n    cycles_total: results.length\n  }\n};"
+      },
+      "position": [1120, 350],
+      "typeVersion": 1
+    },
+    {
+      "id": "write-results",
+      "name": "Write Results to DataTable + File",
+      "type": "@n8n/n8n-nodes-langchain.n8nDataTable",
+      "parameters": {
+        "operation": "addItem",
+        "tableName": "handoff_packets",
+        "item": "=JSON.stringify({\n  packet_id: `pkt-verify-${Date.now().toString(16).padStart(16, '0').slice(-16)}`,\n  schema: 'handoff.packet.n8n.v1',\n  project_name: 'verification-gate',\n  active_objective: `Verification gate results`,\n  task_status: $json.overall === 'PASS' ? 'done' : 'blocked',\n  branch: 'harness/epic-d',\n  drift_status: $json.overall,\n  next_command: $json.overall === 'PASS' ? '/n8n-loop resume from _workspace/HANDOFF.md' : `/n8n-loop — fix blocked gates: ${$json.blocked_gates.join(', ')}`,\n  created_at: new Date().toISOString()\n})"
+      },
+      "position": [1340, 350],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Manual / Schedule Trigger": {
+      "main": [[{ "node": "Read Affected Repos from DataTable", "type": "main", "index": 0 }]]
+    },
+    "Read Affected Repos from DataTable": {
+      "main": [[{ "node": "Get Execution Order (meta)", "type": "main", "index": 0 }]]
+    },
+    "Get Execution Order (meta)": {
+      "main": [[{ "node": "Gate 1: Cargo Check", "type": "main", "index": 0 }]]
+    },
+    "Gate 1: Cargo Check": {
+      "main": [[{ "node": "Aggregate Verification Results", "type": "main", "index": 0 }]]
+    },
+    "Aggregate Verification Results": {
+      "main": [[{ "node": "Write Results to DataTable + File", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "name": "Blast Radius Analyzer — Meta Dependency Graph",
+  "description": "Reads .meta.yaml and Cargo.toml to build the full dependency graph, computes blast radius for a given change scope, outputs topo-sorted execution order and risk assessment.",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [240, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "input-params",
+      "name": "Input Change Scope",
+      "type": "n8n-nodes-base.set",
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "changed_crate", "value": "meta_core" },
+            { "name": "repo_root", "value": "={{ $env.META_ROOT }}" }
+          ]
+        }
+      },
+      "position": [460, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "read-deps",
+      "name": "Read Cargo.toml Dependencies",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "parameters": {
+        "filePath": "={{ $env.META_ROOT + '/Cargo.toml' }}"
+      },
+      "position": [680, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "build-graph",
+      "name": "Build Dependency Graph",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "// Parse Cargo.toml and build dependency graph\nconst content = $binary['data'].toString('utf8');\nconst lines = content.split('\\n');\nlet inDeps = false;\nlet inWorkspaceDeps = false;\nconst deps = {};\nlet currentCrate = '';\n\nfor (const line of lines) {\n  if (line.startsWith('[workspace.dependencies]')) {\n    inWorkspaceDeps = true;\n    continue;\n  }\n  if (line.startsWith('[')) {\n    inWorkspaceDeps = false;\n    continue;\n  }\n  if (inWorkspaceDeps && line.includes('=')) {\n    const [name, val] = line.split('=').map(s => s.trim().replace(/\"/g, ''));\n    deps[name] = val;\n  }\n}\n\n// Read .meta.yaml projects for cross-repo context\nconst fs = require('fs');\nconst path = require('path');\nconst metaRoot = process.env.META_ROOT;\nif (!metaRoot) throw new Error('META_ROOT is required; run envctl env or ask envctl over weave before running this workflow.');\nconst yamlPath = path.join(metaRoot, '.meta.yaml');\nlet metaProjects = [];\ntry {\n  const yamlContent = fs.readFileSync(yamlPath, 'utf8');\n  // Simple line-based parsing as fallback\n  const projectLines = yamlContent.split('\\n').filter(l => l.trim().startsWith('-') || (l.startsWith(' ') && !l.includes(':')));\n  metaProjects = projectLines.map(l => l.replace(/[- ]/, '').trim()).filter(Boolean);\n} catch(e) {\n  // If .meta.yaml parsing fails, use known workspace members\n}\n\n// Build reverse dependency map for the changed crate\nconst changedCrate = $json.changed_crate;\nconst dependents = [];\nfor (const [crate, val] of Object.entries(deps)) {\n  if (val.includes(changedCrate) || crate.toLowerCase() === changedCrate.toLowerCase()) {\n    dependents.push(crate);\n  }\n}\n\n// Transitive closure: find all crates that transitively depend on the changed crate\nconst visited = new Set();\nfunction traceTransitive(crate, depth = 0) {\n  if (depth > 10 || visited.has(crate)) return;\n  visited.add(crate);\n  for (const [other, val] of Object.entries(deps)) {\n    if (val.includes(crate) && !visited.has(other)) {\n      traceTransitive(other, depth + 1);\n    }\n  }\n}\ntraceTransitive(changedCrate);\n\nreturn {\n  json: {\n    direct_dependents: dependents,\n    transitive_dependents: [...visited],\n    meta_projects_context: metaProjects.slice(0, 20),\n    graph_built: true\n  }\n};"
+      },
+      "position": [900, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "topo-sort",
+      "name": "Topological Sort Execution Order",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "// Kahn's algorithm for topological sort\nconst graph = {};\nconst inDegree = {};\n\n// Build adjacency from the parsed deps\nfor (const [crate, val] of Object.entries($json.graph_raw || {})) {\n  if (!graph[crate]) graph[crate] = [];\n}\n\nconst visited = new Set($json.transitive_dependents || []);\nconst directDeps = $json.direct_dependents || [];\n\n// Simple topo sort: foundation crates first, then dependents\nconst order = [];\nfor (const crate of visited) {\n  // Foundation crates have fewer deps, go first\n  const isFoundation = ['meta_core', 'loop_lib', 'meta_plugin_protocol', 'meta_mcp'].includes(crate);\n  order.push({ crate, tier: isFoundation ? 0 : 1 });\n}\norder.sort((a, b) => a.tier - b.tier);\nreturn { json: { execution_order: order.map(o => o.crate), topo_built: true } };"
+      },
+      "position": [1120, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "assess-risk",
+      "name": "Assess Risk Level",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "func": "=const depCount = $json.direct_dependents ? $json.direct_dependents.length : 0;\nconst transCount = $json.transitive_dependents ? $json.transitive_dependents.length : 0;\nconst totalAffected = depCount + (transCount - depCount);\n\nlet risk = 'Low';\nif (totalAffected >= 6) risk = 'Critical';\nelse if (totalAffected >= 3) risk = 'High';\nelse if (totalAffected >= 1) risk = 'Medium';\n\nconst foundationTiers = ['meta_core', 'loop_lib', 'meta_plugin_protocol', 'meta_mcp'];\nconst changedCrate = $json.changed_crate;\nif (foundationTiers.includes(changedCrate)) risk = totalAffected > 2 ? 'Critical' : 'High';\n\nreturn { json: { risk_level: risk, affected_repos_count: totalAffected, direct_dependents: $json.direct_dependents || [], transitive_dependents: $json.transitive_dependents || [] } };"
+      },
+      "position": [1340, 300],
+      "typeVersion": 1
+    },
+    {
+      "id": "write-result",
+      "name": "Write Blast Radius Result",
+      "type": "@n8n/n8n-nodes-langchain.n8nDataTable",
+      "parameters": {
+        "operation": "addItem",
+        "tableName": "handoff_packets",
+        "item": "=JSON.stringify({\n  packet_id: `pkt-blast-${Date.now().toString(16).padStart(16, '0').slice(-16)}`,\n  schema: 'handoff.packet.n8n.v1',\n  project_name: 'blast-radius-analyzer',\n  active_objective: `Blast radius analysis for ${$json.changed_crate}`,\n  current_task_id: '',\n  task_status: 'analyzed',\n  branch: 'harness/epic-d',\n  drift_status: 'pass',\n  next_command: '/n8n-loop resume from _workspace/HANDOFF.md'\n})"
+      },
+      "position": [1560, 300],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Input Change Scope", "type": "main", "index": 0 }]]
+    },
+    "Input Change Scope": {
+      "main": [[{ "node": "Read Cargo.toml Dependencies", "type": "main", "index": 0 }]]
+    },
+    "Read Cargo.toml Dependencies": {
+      "main": [[{ "node": "Build Dependency Graph", "type": "main", "index": 0 }]]
+    },
+    "Build Dependency Graph": {
+      "main": [[{ "node": "Topological Sort Execution Order", "type": "main", "index": 0 }]]
+    },
+    "Topological Sort Execution Order": {
+      "main": [[{ "node": "Assess Risk Level", "type": "main", "index": 0 }]]
+    },
+    "Assess Risk Level": {
+      "main": [[{ "node": "Write Blast Radius Result", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

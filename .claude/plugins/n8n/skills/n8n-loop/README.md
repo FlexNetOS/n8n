@@ -38,8 +38,30 @@ decision) yields `_workspace/NEEDS-HUMAN`, never a forced action or a false gree
 
 These are git-tracked via a `.gitignore` carve-out; per-run `*.log` files are not.
 
+### DataTable ledger (new)
+
+In addition to file-based state, the harness uses n8n DataTables for machine-readable durability:
+- **`handoff_packets`** — authoritative packet ledger (extends `_workspace/HANDOFF.md`)
+- **`session_events`** — lifecycle event log (session_started, resumed, checkpoint_created, etc.)
+- Schema reference: `_workspace/handoff/schema-datatable.md`
+- Full architecture: see [_workspace/handoff/README.md](../../_workspace/handoff/README.md)
+
+## Pillars (new)
+
+The harness has four automated pillars — each with an agent spec + n8n workflow:
+
+| Pillar | Agent Spec | Workflow | Purpose |
+|--------|-----------|---------|---------|
+| Backlog-Curator | `[backlog-curators.md](_workspace/pillars/backlog-curator/backlog-curators.md)` | `meta-discovery.n8n.json` | Discover work from `.meta.yaml`, Cargo deps, Linear/GitHub |
+| Feature-Architect | `[feature-architect-n8n.md](_workspace/pillars/feature-architect/feature-architect-n8n.md)` | `blast-radius-analyzer.n8n.json` | Blast radius + topo-sorted execution order |
+| Verification-Gate | `[verification-gate-n8n.md](_workspace/pillars/verification-gate/verification-gate-n8n.md)` | `multi-toolchain-verify.n8n.json` | Multi-toolchain gates (cargo/bun/lint/smoke) |
+| Docs-Scribe | `[docs-scribe-n8n.md](_workspace/pillars/docs-scribe/docs-scribe-n8n.md)` | `meta-doc-sync.n8n.json` | Changelog/ADR/AGENTS.md sync across repos |
+
+See [_workspace/handoff/README.md](../../_workspace/handoff/README.md) for the full architecture.
+
 ## Verify per cycle
 
-Scoped (never a full monorepo build per cycle): `pnpm -F <touched-package> build` · affected
-`pnpm test` · lint · for runtime changes, the `run-n8n` smoke (`/healthz` 200 + smoke test) through
+Scoped (never a full monorepo build per cycle): `bun test _workspace/handoff/scripts/` · `cargo check --workspace` · affected package lint · for runtime changes, the `run-n8n` smoke (`/healthz` 200 + smoke test) through
 the n8n MCP server. Optionally `mutant-score` on a changed test file to confirm it asserts.
+
+> **Bun swap**: All harness scripts use bun (not pnpm). The n8n source repo itself stays on pnpm/node for CI/build — see `BUN-MIGRATION.md`.

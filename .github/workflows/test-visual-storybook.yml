@@ -22,7 +22,7 @@ jobs:
     if: |
       !contains(github.event.pull_request.labels.*.name, 'community') &&
       github.repository == 'n8n-io/n8n'
-    runs-on: blacksmith-2vcpu-ubuntu-2204
+    runs-on: ${{ vars.N8N_CI_RUNNER_2CPU || 'ubuntu-latest' }}
     permissions:
       contents: read
       deployments: write

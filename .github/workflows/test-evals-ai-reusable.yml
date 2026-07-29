@@ -35,7 +35,7 @@ on:
 jobs:
   evals:
     name: Run ${{ inputs.suite }} Evaluations
-    runs-on: blacksmith-2vcpu-ubuntu-2204
+    runs-on: ${{ vars.N8N_CI_RUNNER_2CPU || 'ubuntu-latest' }}
     steps:
       - name: Validate branch input
         env:

@@ -19,7 +19,7 @@ jobs:
     # want fork coverage later, do it via a separate privileged
     # `workflow_run` workflow that picks up an artifact from this one.
     if: ${{ !github.event.pull_request.head.repo.fork }}
-    runs-on: ${{ vars.RUNNER_PROVIDER == 'github' && 'ubuntu-latest' || 'blacksmith-4vcpu-ubuntu-2204' }}
+    runs-on: ${{ vars.N8N_CI_RUNNER_4CPU || 'ubuntu-latest' }}
     # Non-blocking: a failure here surfaces in the PR Checks tab as a soft
     # signal but never gates merge. Remove `continue-on-error` once we have
     # confidence the grind has a low false-positive rate.

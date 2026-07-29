@@ -26,8 +26,37 @@ All under the repo-root `_workspace/` (git-tracked ledger; logs gitignored):
   `session_started` (UTC, you supply it — never call Date.now), `last_item`, `status`, `apply_mode`.
 - **Per-cycle artifacts** — `NN_<stage>_<item>.md` for the item in flight (design notes, verify
   output). These are gitignored scratch; the *ledger* is what gets committed.
+- **DataTable ledger** (`handoff_packets` via `@n8n-nodes-langchain.n8nDataTable`) — authoritative machine-readable state at `_workspace/handoff/`. Every cycle writes a row here validated against `packet-n8n.schema.json`. Read first; fall back to HANDOFF.md file if DataTable queries fail.
+- **Handoff schemas** (`_workspace/handoff/schemas/`) — reference JSON schemas copied from `weave/sessions-handoff`, adapted for n8n contexts.
 
-## Phase 0: context check (initial / resume / partial)
+## Pillar Coordination
+
+The harness has four automated pillars that extend the core Ralph loop with meta workspace awareness. Each pillar has an **agent spec** (orchestration decisions) and an **n8n workflow** (automated execution):
+
+| Pillar | Agent Spec | n8n Workflow | Purpose |
+|--------|-----------|-------------|---------|
+| **Backlog-Curator** | `_workspace/pillars/backlog-curator/backlog-curators.md` | `meta-discovery.n8n.json` | Discovers work from `.meta.yaml`, Cargo deps, Linear/GitHub; produces prioritized backlog |
+| **Feature-Architect** | `_workspace/pillars/feature-architect/feature-architect-n8n.md` | `blast-radius-analyzer.n8n.json` | Blast radius via meta dependency chains; topo-sorted execution order; risk assessment |
+| **Verification-Gate** | `_workspace/pillars/verification-gate/verification-gate-n8n.md` | `multi-toolchain-verify.n8n.json` | Multi-toolchain gates: cargo check → bun test → bunx lint → run-n8n smoke in dep order |
+| **Docs-Scribe** | `_workspace/pillars/docs-scribe/docs-scribe-n8n.md` | `meta-doc-sync.n8n.json` | Changelog/ADR/AGENTS.md sync across all 51 meta repos; ADR generation for architecture decisions |
+
+### How pillars wire into the loop
+
+```
+Cycle start → Backlog-Curator DISCOVER (agent + n8n workflow)
+    ↓ picks next item
+design (spec-driven-development agent) → implement
+    ↓
+Feature-Architect blast-radius analysis (agent + n8n workflow)
+    ↓ determines execution order
+Verification-Gate gates in topo order (agent + n8n workflow)
+    ↓ all pass?
+Docs-Scribe syncs documentation across repos (agent + n8n workflow)
+    ↓
+tick item → commit → re-fire or handoff
+```
+
+The n8n workflows automate the scanning/computation-heavy parts; agents handle orchestration decisions. This hybrid model lets meta be mapped and automated by n8n — the platform that builds itself becomes the automation engine for everything inside it.
 1. **`_workspace/HANDOFF.md` exists, or the prompt says "resume"** → **RESUME**: follow
    `n8n:session-relay` RESUME (read committed HANDOFF, run Verify-on-resume baseline, ack via weave,
    reset `cycles_this_session=0`), then run the iteration body from the backlog's current item.

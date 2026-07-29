@@ -62,6 +62,11 @@ A **Guard** step (IF/Code) runs **before** execution and **fails closed**:
 - Child process gets a **scrubbed env**: only `PATH`, `HOME`=sandbox, and the single
   `ANTHROPIC_API_KEY` (or the configured auth) — **strip everything else** (no `N8N_*`, no
   `*_TOKEN`, no `settings.local.json` contents).
+  - **Approved exception (B-3, see §7):** on this box `claude` auths via the subscription login,
+    not `ANTHROPIC_API_KEY`. The implemented Run Claude node therefore copies **only**
+    `~/.claude/.credentials.json` into the sandbox `HOME` per run. G4 is relaxed to permit that
+    single creds file; the filesystem stays confined to the sandbox (G3 intact). Nothing else
+    crosses into the child env.
 - **Tool restriction:** invoke claude with the **least-privilege** flag set. Default to a
   read-only/answer-only profile: `--permission-mode plan` (or an equivalent allowed-tools allowlist
   that excludes Bash/Write/Edit). **NEVER** `--dangerously-skip-permissions`.
@@ -118,7 +123,7 @@ flowchart LR
 | `DENYLIST` | rm -rf, /etc/, ~/.ssh, .env, secret, token, password, --dangerously, sudo, curl, wget, ssh, base64, `> /` | G2 |
 | `SANDBOX_DIR` | `~/.n8n-claude-bridge/sandbox` | G3 |
 | `CLAUDE_FLAGS` | `-p --permission-mode plan` | G4 |
-| `CHILD_ENV_ALLOW` | `PATH`, `HOME`(=sandbox), `ANTHROPIC_API_KEY` | G4 |
+| `CHILD_ENV_ALLOW` | `PATH`, `HOME`(=sandbox), `ANTHROPIC_API_KEY` · **+ copy `~/.claude/.credentials.json` → sandbox HOME** (approved exception, §7) | G4 |
 | `TIMEOUT_SEC` | 60 | G5 |
 | `MAX_OUTPUT_BYTES` | 1048576 | G5 |
 | `REPLY_TRUNCATE_CHARS` | 4000 | G5 |
@@ -151,9 +156,18 @@ flowchart LR
 - **RESOLVED — Auth (G6):** for SAFE/MVP use `public: false` (chat reachable only via n8n's
   login-gated manual interface). For a public deployment, set `public: true` + `authentication:
   basicAuth` with a credential. Authored as `public: false`.
-- **STILL OPEN (B-3):** confirm the installed Claude Code build honors `--permission-mode plan`
-  headless; if not, fall back to an `--allowedTools` allowlist excluding Bash/Write/Edit. Grounded
-  against the live CLI at deploy.
+- **RESOLVED (B-3, 2026-06-05):** `claude -p --permission-mode plan` works headless on this box —
+  the live round-trip returned a normal answer ("Paris is the capital of France."), so plan mode did
+  not block a plain Q&A. Kept as the least-privilege default.
+- **RESOLVED (B-3) — runtime constraints found at deploy:** (a) the n8n Code node is sandboxed →
+  the instance must run with `NODE_FUNCTION_ALLOW_BUILTIN=child_process,os,path,fs` (reaches the
+  external task runner via n8n's env passthrough). (b) the sandbox exposes **no `process` global** →
+  env is read via n8n's `$env` (PATH), with a hardcoded PATH fallback.
+- **RESOLVED (B-3) — auth model (user decision):** `claude` here auths via the subscription login in
+  `~/.claude/.credentials.json`, not `ANTHROPIC_API_KEY`. Chosen trade-off (user-approved): Run Claude
+  copies ONLY `~/.claude/.credentials.json` into the sandbox `HOME` per run, so claude auths while the
+  filesystem stays confined to the sandbox (G3 preserved; G4 relaxed to permit the single creds file).
+  The sandbox therefore holds a fresh copy of the claude credentials.
 - **Validator residual warnings (acknowledged, non-blocking):** Code-node `child_process` access (=the
   env prereq above); IF `main[1]` "missing onError" (false-positive — `main[1]` is the IF *false*
   branch, not an error output); "Code can throw" (defensive — both Code nodes set
@@ -163,5 +177,6 @@ flowchart LR
 - [x] B-1 — author this spec (guardrails-first). **Done 2026-06-05.**
 - [x] B-2 — author + validate the workflow JSON (SAFE; no deploy). **Done 2026-06-05** —
       `_workspace/wf/claude-n8n-chat-bridge.json`, `validate_workflow` valid (0 errors).
-- [ ] B-3 — (APPLY) deploy + smoke round-trip + injection-rejection check. **Blocked on
-      `NODE_FUNCTION_ALLOW_BUILTIN` instance config + APPLY mode.**
+- [x] B-3 — (APPLY) deploy + smoke round-trip + injection-rejection check. **Done 2026-06-05** —
+      workflow `ggvV5wItgjsRnwFk` (inactive). Round-trip exec 6 returned a real claude answer;
+      injection exec 7 was denylisted → Refuse (claude never invoked). Left inactive (manual-exec).

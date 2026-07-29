@@ -16,8 +16,8 @@ For handing a loop off to a fresh session or resuming from a handoff, it drives 
 `.claude/plugins/n8n/skills/n8n-loop/scripts/ralph-n8n.sh` (SAFE by default; `N8N_APPLY=1` to act;
 `touch _workspace/STOP` to halt). Simple one-off changes use the relevant skill directly, not the loop.
 
-**Kit references:** generic `~/Desktop/meta/HARNESS-UPGRADE-KIT.md` · tailored
-`~/Desktop/meta/harness_hub/upgrade-kits/n8n.md`.
+**Kit references:** generic `$META_ROOT/HARNESS-UPGRADE-KIT.md` · tailored
+`$META_ROOT/harness_hub/upgrade-kits/n8n.md`.
 
 **Change history:**
 | Date | Change | Target | Reason |

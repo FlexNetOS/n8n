@@ -12,10 +12,9 @@ resume on the other side. Two entry points: **HAND OFF** and **RESUME**.
 
 ## Substrates (verify before using)
 
+- **DataTable ledger** (`handoff_packets` DataTable via `@n8n-nodes-langchain.n8nDataTable`) — the authoritative machine-readable state. Every row is validated against `_workspace/handoff/schemas/packet-n8n.schema.json`. This is n8n's implementation of the Rust-native `.handoff/ledger.db` concept from `sessions-handoff`. Always read/write here first; FALL BACK to HANDOFF.md file only if DataTable queries fail.
 - **Checkpoint:** `_workspace/HANDOFF.md`, produced by the `n8n:continuity-steward` agent — the
-  cold-start resume package. This is the real payload; everything else just points at it. It MUST be
-  committed (the root `_workspace/` ledger files are git-tracked by a `.gitignore` carve-out; logs
-  are not).
+  cold-start resume package (human-readable). Validated against the packet schema BEFORE use.
 - **weave** (`weave_send`/`weave_whoami`/`weave_inbox`) — the **cross-identity** heartbeat + audit
   channel. **Verified gotcha:** a message addressed to your *own* identity does **not** appear in
   your own inbox, and a same-machine successor inherits the same identity — so weave-inbox is **not**
@@ -34,7 +33,8 @@ resume on the other side. Two entry points: **HAND OFF** and **RESUME**.
 
 Run in order; each step is durable before the next, so a crash mid-handoff is recoverable.
 
-1. **Produce the checkpoint.** Spawn the `n8n:continuity-steward` agent (general-purpose, opus),
+1. **Produce the DataTable row.** Call `@n8n-nodes-langchain.n8nDataTable` (via MCP) with `insertRow` to write to `handoff_packets`. Use the packet fields defined by `_workspace/handoff/schemas/packet-n8n.schema.json` — include `packet_id`, `schema: handoff.packet.n8n.v1`, `active_objective`, `current_task_id`, `task_status`, `branch`, `changed_files` (JSON array), `drift_status`, `next_command`, `created_at` (UTC ISO). Set `archived=false`. If the DataTable write fails, fall back to HANDOFF.md only.
+2. **Produce the checkpoint file.** Spawn the `n8n:continuity-steward` agent (general-purpose, opus),
    passing the current UTC timestamp (you supply it — agents/scripts can't read the clock), the repo
    path + branch, and the loop ledger. It writes `_workspace/HANDOFF.md` and returns
    `HANDOFF READY` / `HANDOFF INCOMPLETE`. If INCOMPLETE, fix the gap (or flag it) before
@@ -66,12 +66,8 @@ Run in order; each step is durable before the next, so a crash mid-handoff is re
 
 ## RESUME (successor session, on start / cron fire / runner spawn)
 
-1. **Take the signal from the prompt/checkpoint, not the inbox.** Your resume instruction comes from
-   the prompt (or a human) and the **committed `_workspace/HANDOFF.md`** — the authoritative signal.
-   `weave_inbox` will **not** contain a same-identity handoff; check it only for *cross-identity*
-   notes from peers/operators. Run `weave_whoami` to confirm identity.
-2. **Load the checkpoint.** Read `_workspace/HANDOFF.md` fully. Verify the repo path + branch match
-   and the tree is clean; run its **Verify-on-resume** commands to confirm a sane baseline before
+1. **Read from DataTable first.** Query `handoff_packets` via `@n8n-nodes-langchain.n8nDataTable` for the latest unarchived row. Validate against `_workspace/handoff/schemas/packet-n8n.schema.json`. If the query returns no rows, FALL BACK to reading `_workspace/HANDOFF.md` directly.
+2. **Load the checkpoint file.** Read `_workspace/HANDOFF.md` fully — cross-reference with the DataTable row. Verify the repo path + branch match and the tree is clean; run its **Verify-on-resume** commands to confirm a sane baseline before
    mutating anything.
 3. **Acknowledge.** Broadcast `weave_send to:"all" subject:n8n-relay:resumed` —
    `RESUMED @ <ts>, baseline verified, continuing at item <id>` (visible heartbeat for the mesh).

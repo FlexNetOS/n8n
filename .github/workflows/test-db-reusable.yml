@@ -21,7 +21,7 @@ jobs:
       matrix:
         include:
           - name: SQLite Pooled
-            runner: blacksmith-4vcpu-ubuntu-2204
+            runner: ${{ vars.N8N_CI_RUNNER_4CPU || 'ubuntu-latest' }}
             test-cmd: pnpm test:sqlite
             migration-cmd: pnpm test:sqlite:migrations
             collectCoverage: 'false'
@@ -29,8 +29,9 @@ jobs:
             # 4vcpu is enough since persistent-worker + template-DB make PG16
             # complete in ~480s, which is now close to the SQLite leg (~360s)
             # — the matrix wall is bounded by the slower leg, so the larger
-            # 8vcpu runner buys headroom we can't cash in anywhere.
-            runner: blacksmith-4vcpu-ubuntu-2204
+            # 8vcpu runner buys headroom we can't cash in anywhere. Keep that
+            # as the default while still honouring a fleet-provided override.
+            runner: ${{ vars.N8N_CI_RUNNER_8CPU || 'blacksmith-4vcpu-ubuntu-2204' }}
             test-cmd: pnpm test:postgres:integration:tc
             migration-cmd: pnpm test:postgres:migrations:tc
             TEST_IMAGE_POSTGRES: 'postgres:16'
@@ -39,7 +40,7 @@ jobs:
       TEST_IMAGE_POSTGRES: ${{ matrix.TEST_IMAGE_POSTGRES }}
       COVERAGE_ENABLED: ${{ matrix.collectCoverage }}
     steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref }}
 

@@ -1,0 +1,26 @@
+{
+  "mappings": {
+    "pnpm install": "bun install",
+    "pnpm -F <pkg> build": "bun run --cwd packages/<pkg> build",
+    "pnpm -F <pkg> test": "bun test --cwd packages/<pkg>",
+    "pnpm lint": "bun lint",
+    "pnpm typecheck": "bun typecheck",
+    "npx <pkg>": "bunx <pkg>",
+    "node script.mjs": "bun run script.mjs",
+    "pnpm start": "NODE_ENV=development bun run packages/cli/src/bin/start.ts"
+  },
+  "scripts_path": "_workspace/handoff/scripts/",
+  "meta_repo_root": "${META_ROOT}/",
+  "harness_toolchain": {
+    "install": "bun install",
+    "test": "bun test",
+    "lint": "bunx biome check --write .",
+    "format": "bunx biome format --write .",
+    "typecheck": "bunx tsc --noEmit"
+  },
+  "n8n_repo_constraints": {
+    "ci_build": "pnpm build (Node.js 22 required, CI unchanged)",
+    "dev_server": "bun run packages/cli/src/bin/start.ts (local dev only)",
+    "test_runner": "bun test for harness scripts; jest for n8n source"
+  }
+}

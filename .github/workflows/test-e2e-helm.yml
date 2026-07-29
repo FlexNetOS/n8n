@@ -26,13 +26,12 @@ on:
         default: 'queue'
 
 env:
-  DOCKER_IMAGE: ghcr.io/${{ github.repository }}:ci-${{ github.run_id }}
   HELM_CHART_REF: ${{ inputs.helm-chart-ref || 'main' }}
 
 jobs:
   build:
     name: 'Build Docker Image'
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ${{ vars.N8N_CI_RUNNER_4CPU || 'ubuntu-latest' }}
     permissions:
       packages: write
       contents: read
@@ -42,6 +41,13 @@ jobs:
         with:
           ref: ${{ inputs.branch || github.ref }}
           fetch-depth: 1
+
+      - name: Normalize GHCR refs
+        id: normalize-ghcr
+        shell: bash
+        run: |
+          echo "repository=$(printf '%s' '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          echo "owner=$(printf '%s' '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Login to GHCR
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
@@ -57,14 +63,14 @@ jobs:
           enable-docker-cache: true
         env:
           INCLUDE_TEST_CONTROLLER: 'true'
-          IMAGE_BASE_NAME: ghcr.io/${{ github.repository }}
+          IMAGE_BASE_NAME: ghcr.io/${{ steps.normalize-ghcr.outputs.repository }}
           IMAGE_TAG: ci-${{ github.run_id }}
-          RUNNERS_IMAGE_BASE_NAME: ghcr.io/${{ github.repository_owner }}/runners
+          RUNNERS_IMAGE_BASE_NAME: ghcr.io/${{ steps.normalize-ghcr.outputs.owner }}/runners
 
   helm-e2e:
     name: "Helm E2E (${{ inputs.mode || 'queue' }})"
     needs: build
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ${{ vars.N8N_CI_RUNNER_4CPU || 'ubuntu-latest' }}
     timeout-minutes: 30
     permissions:
       contents: read
@@ -74,6 +80,12 @@ jobs:
         with:
           ref: ${{ inputs.branch || github.ref }}
           fetch-depth: 1
+
+      - name: Normalize GHCR refs
+        id: normalize-ghcr
+        shell: bash
+        run: |
+          echo "repository=$(printf '%s' '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Setup Environment
         uses: ./.github/actions/setup-nodejs
@@ -93,11 +105,12 @@ jobs:
       - name: Start K3s + Helm stack
         env:
           TESTCONTAINERS_RYUK_DISABLED: 'true'
+          DOCKER_IMAGE: ghcr.io/${{ steps.normalize-ghcr.outputs.repository }}:ci-${{ github.run_id }}
         run: |
           npx tsx packages/testing/containers/helm-start-stack.ts \
             --env E2E_TESTS=true --env NODE_ENV=development \
             --mode "${{ inputs.mode || 'queue' }}" \
-            --image "${{ env.DOCKER_IMAGE }}" \
+            --image "${DOCKER_IMAGE}" \
             --chart-ref "${{ env.HELM_CHART_REF }}" \
             --url-file /tmp/n8n-helm-url.txt \
             --kubeconfig-file /tmp/n8n-helm-kubeconfig.txt
@@ -153,7 +166,7 @@ jobs:
     name: 'Cleanup GHCR Image'
     needs: [build, helm-e2e]
     if: always()
-    runs-on: blacksmith-2vcpu-ubuntu-2204
+    runs-on: ${{ vars.N8N_CI_RUNNER_2CPU || 'ubuntu-latest' }}
     permissions:
       packages: write
       contents: read
@@ -164,10 +177,15 @@ jobs:
           sparse-checkout: .github/scripts
           sparse-checkout-cone-mode: false
 
+      - name: Normalize GHCR org
+        id: normalize-ghcr
+        shell: bash
+        run: echo "owner=$(printf '%s' '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Delete images from GHCR
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_ORG: ${{ github.repository_owner }}
+          GHCR_ORG: ${{ steps.normalize-ghcr.outputs.owner }}
           GHCR_REPO: ${{ github.event.repository.name }}
         run: node .github/scripts/cleanup-ghcr-images.mjs --tag ci-${{ github.run_id }}
