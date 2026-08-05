@@ -46,7 +46,7 @@
     "autoprefixer": "^10.4.19",
     "emojibase-data": "^17.0.0",
     "eslint-plugin-storybook": "catalog:storybook",
-    "postcss": "^8.4.38",
+    "postcss": "^8.5.23",
     "sass": "^1.71.1",
     "storybook": "catalog:storybook",
     "storybook-addon-vue-mdx": "3.0.0",
